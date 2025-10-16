@@ -1,0 +1,8 @@
+.env
+node_modules/
+chroma_store/
+docker/
+docs/
+pms_depend/
+*.zip
+*.csv
