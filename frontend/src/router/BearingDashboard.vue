@@ -17,7 +17,7 @@
               />
             </svg>
           </div>
-          <h2 class="text-lg font-bold leading-tight tracking-[-0.015em]">Bearing Insights</h2>
+          <h2 class="text-lg font-bold leading-tight tracking-[-0.015em]">베어링 인사이트</h2>
         </div>
         <div class="flex flex-1 justify-end gap-2">
           <nav class="flex items-center gap-2">
@@ -33,6 +33,8 @@
           <div class="flex items-center gap-4 pl-6">
             <button
               class="flex h-10 w-10 items-center justify-center rounded-full bg-transparent hover:bg-primary/10 dark:hover:bg-primary/20"
+              aria-label="알림"
+              title="알림"
             >
               <div data-icon="Bell" data-size="20px" data-weight="regular">
                 <svg
@@ -50,6 +52,8 @@
             </button>
             <div
               class="bg-center bg-no-repeat bg-cover rounded-full size-10"
+              aria-label="프로필 이미지"
+              title="프로필"
               style="
                 background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuA-1glDTGDlDnipO_QpEBQpBvrnKv9pxqMKc_4oK5p-XbPJ9OpSupYuezF9I7HikDcluR8U2FFx_o1vjr4Emd8ySjtqRAAKg-PP9lh9nV5xEHwQMZ_Ct9R8HXwxE9DCE6Uz61qGnm2hfSwZV-f70_vDHvvKysIBd1dtwYZTvQdIPHiPmxjJbpgogYjKMs3bnegoZGF6wItP-EmtDAm1ib8CYY47rz16rmcslR0Wv8GurmJDV93XTiEMVoXPWGyI4NZ04pUty0tnc2I');
               "
@@ -61,9 +65,9 @@
       <main class="flex flex-1 justify-center px-10 py-8 md:px-20 lg:px-40">
         <div class="layout-content-container flex w-full max-w-6xl flex-col">
           <div class="flex flex-col gap-2 p-4">
-            <h1 class="text-3xl font-bold">Bearing Monitoring Dashboard</h1>
+            <h1 class="text-3xl font-bold">베어링 모니터링 대시보드</h1>
             <p class="text-base font-normal text-black/60 dark:text-white/60">
-              Real-time insights into bearing health and predictive analytics.
+              베어링 상태와 예지 보전 지표를 실시간으로 확인합니다.
             </p>
           </div>
 
@@ -78,141 +82,161 @@
             </div>
           </div>
 
-          <h2 class="px-4 pb-3 pt-8 text-2xl font-bold">Bearing Health Overview</h2>
+          <h2 class="px-4 pb-3 pt-8 text-2xl font-bold">베어링 상태 개요</h2>
 
           <div class="grid grid-cols-1 gap-6 px-4 py-6 lg:grid-cols-2">
+            <!-- (3) PMS 결과: 1시간 단위 선그래프 -->
             <div
               class="flex flex-col gap-4 rounded-xl border border-primary/20 bg-background-light p-6 dark:border-primary/30 dark:bg-background-dark"
             >
-              <p class="text-lg font-medium">Bearing Condition Distribution</p>
-              <div class="flex items-baseline gap-3">
-                <p class="text-4xl font-bold">{{ bearingConditionSummary.percentage }}%</p>
-                <p class="text-base font-medium text-green-500">
-                  +{{ bearingConditionSummary.delta }}%
-                </p>
-              </div>
-              <p class="text-sm font-normal text-black/60 dark:text-white/60">Last 24 Hours</p>
-              <div class="grid h-48 grid-flow-col items-end justify-items-center gap-6 pt-4">
-                <div
-                  v-for="segment in bearingConditionSegments"
-                  :key="segment.label"
-                  class="flex h-full w-full flex-col items-center justify-end gap-2"
+              <p class="text-lg font-medium">PMS 결과 (1시간 단위)</p>
+              <p class="text-sm font-normal text-black/60 dark:text-white/60">최근 12시간 기준</p>
+
+              <div class="relative h-48 w-full">
+                <svg
+                  :viewBox="`0 0 ${chartConfig.width} ${chartConfig.height}`"
+                  preserveAspectRatio="none"
+                  class="size-full"
                 >
-                  <div
-                    class="w-full rounded bg-primary/30"
-                    :style="{ height: `${segment.height}%` }"
-                  ></div>
-                  <p
-                    class="text-xs font-bold uppercase tracking-wider text-black/60 dark:text-white/60"
-                  >
-                    {{ segment.label }}
-                  </p>
+                  <defs>
+                    <linearGradient id="pmsStroke" x1="0" x2="0" y1="0" y2="1">
+                      <stop offset="0%" stop-color="#3b82f6" />
+                      <stop offset="100%" stop-color="#60a5fa" />
+                    </linearGradient>
+                  </defs>
+                  <polyline
+                    :points="pmsSeries.points"
+                    fill="none"
+                    stroke="url(#pmsStroke)"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="3"
+                  />
+                  <g>
+                    <circle
+                      v-for="pt in pmsSeries.coordinates"
+                      :key="`pms-${pt.label}`"
+                      :cx="pt.x"
+                      :cy="pt.y"
+                      r="3"
+                      class="drop-shadow-sm"
+                      fill="#3b82f6"
+                    />
+                  </g>
+                </svg>
+                <div
+                  class="absolute inset-x-0 bottom-0 flex justify-between px-2 text-xs text-black/50 dark:text-white/50"
+                >
+                  <span v-for="pt in pmsHourlyData" :key="`pms-label-${pt.label}`">
+                    {{ pt.label }}
+                  </span>
+                </div>
+              </div>
+
+              <div class="grid grid-cols-2 gap-3 text-sm">
+                <div
+                  class="flex items-center gap-2 rounded-lg bg-primary/10 p-3 dark:bg-primary/20"
+                >
+                  <span class="size-2.5 rounded-full" style="background: #3b82f6"></span>
+                  <span class="font-semibold text-black/80 dark:text-white/80">PMS 점수(%)</span>
+                  <span class="ml-auto text-black/60 dark:text-white/60">{{ latestPms }}%</span>
+                </div>
+                <div
+                  class="flex items-center gap-2 rounded-lg bg-primary/10 p-3 dark:bg-primary/20"
+                >
+                  <span class="font-semibold text-black/80 dark:text-white/80">최신 시각</span>
+                  <span class="ml-auto text-black/60 dark:text-white/60">{{ latestPmsLabel }}</span>
                 </div>
               </div>
             </div>
 
+            <!-- (4) 이상 신호 탐지: 0/1, 1시간 단위 선그래프 -->
             <div
               class="flex flex-col gap-4 rounded-xl border border-primary/20 bg-background-light p-6 dark:border-primary/30 dark:bg-background-dark"
             >
-              <p class="text-lg font-medium">Bearing Temperature Trends</p>
-              <div class="flex items-baseline gap-3">
-                <p class="text-4xl font-bold">{{ temperatureSummary.current }}</p>
-                <p
-                  class="text-base font-medium"
-                  :class="temperatureSummary.change < 0 ? 'text-green-500' : 'text-red-500'"
+              <p class="text-lg font-medium">이상 신호 탐지 (0/1, 1시간 단위)</p>
+              <p class="text-sm font-normal text-black/60 dark:text-white/60">최근 12시간 기준</p>
+
+              <div class="relative h-48 w-full">
+                <svg
+                  :viewBox="`0 0 ${chartConfig.width} ${chartConfig.height}`"
+                  preserveAspectRatio="none"
+                  class="size-full"
                 >
-                  {{ temperatureSummary.changeLabel }}
-                </p>
+                  <defs>
+                    <linearGradient id="anomalyStroke" x1="0" x2="0" y1="0" y2="1">
+                      <stop offset="0%" stop-color="#ef4444" />
+                      <stop offset="100%" stop-color="#f97316" />
+                    </linearGradient>
+                  </defs>
+                  <polyline
+                    :points="anomalySeries.points"
+                    fill="none"
+                    stroke="url(#anomalyStroke)"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="3"
+                  />
+                  <g>
+                    <circle
+                      v-for="pt in anomalySeries.coordinates"
+                      :key="`ano-${pt.label}`"
+                      :cx="pt.x"
+                      :cy="pt.y"
+                      r="3"
+                      class="drop-shadow-sm"
+                      :fill="pt.value === 1 ? '#ef4444' : '#10b981'"
+                    />
+                  </g>
+
+                  <!-- 좌측 축(0/1 안내선) -->
+                  <line
+                    x1="0"
+                    :y1="chartConfig.height"
+                    x2="8"
+                    :y2="chartConfig.height"
+                    stroke="currentColor"
+                    class="opacity-20"
+                  />
+                  <line x1="0" y1="0" x2="8" y2="0" stroke="currentColor" class="opacity-20" />
+                </svg>
+
+                <div
+                  class="absolute inset-x-0 bottom-0 flex justify-between px-2 text-xs text-black/50 dark:text-white/50"
+                >
+                  <span v-for="pt in anomalyHourlyData" :key="`ano-label-${pt.label}`">
+                    {{ pt.label }}
+                  </span>
+                </div>
+
+                <div
+                  class="absolute right-2 top-2 rounded bg-primary/10 px-2 py-1 text-[10px] text-black/60 dark:bg-primary/20 dark:text-white/60"
+                >
+                  0 = 정상 · 1 = 이상
+                </div>
               </div>
-              <p class="text-sm font-normal text-black/60 dark:text-white/60">
-                Healthy vs Critical (최근 7일)
-              </p>
-              <div class="flex flex-col gap-6 py-4">
-                <div class="relative h-48 w-full">
-                  <svg
-                    :viewBox="`0 0 ${chartConfig.width} ${chartConfig.height}`"
-                    preserveAspectRatio="none"
-                    class="size-full"
-                  >
-                    <defs>
-                      <linearGradient id="healthyStroke" x1="0" x2="0" y1="0" y2="1">
-                        <stop offset="0%" stop-color="#22c55e" />
-                        <stop offset="100%" stop-color="#4ade80" />
-                      </linearGradient>
-                      <linearGradient id="criticalStroke" x1="0" x2="0" y1="0" y2="1">
-                        <stop offset="0%" stop-color="#f97316" />
-                        <stop offset="100%" stop-color="#ef4444" />
-                      </linearGradient>
-                    </defs>
-                    <polyline
-                      :points="healthySeries.points"
-                      fill="none"
-                      stroke="url(#healthyStroke)"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="3"
-                    />
-                    <polyline
-                      :points="criticalSeries.points"
-                      fill="none"
-                      stroke="url(#criticalStroke)"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="3"
-                      class="opacity-90"
-                    />
-                    <g>
-                      <circle
-                        v-for="point in healthySeries.coordinates"
-                        :key="`healthy-${point.label}`"
-                        :cx="point.x"
-                        :cy="point.y"
-                        r="3"
-                        fill="#22c55e"
-                        class="drop-shadow-sm"
-                      />
-                      <circle
-                        v-for="point in criticalSeries.coordinates"
-                        :key="`critical-${point.label}`"
-                        :cx="point.x"
-                        :cy="point.y"
-                        r="3"
-                        fill="#ef4444"
-                        class="drop-shadow-sm"
-                      />
-                    </g>
-                  </svg>
-                  <div
-                    class="absolute inset-x-0 bottom-0 flex justify-between px-2 text-xs text-black/50 dark:text-white/50"
-                  >
-                    <span v-for="point in temperatureTrendData" :key="`label-${point.label}`">
-                      {{ point.label }}
-                    </span>
-                  </div>
-                </div>
 
-                <div class="grid grid-cols-2 gap-3 text-sm">
-                  <div class="flex items-center gap-2 rounded-lg bg-primary/10 p-3 dark:bg-primary/20">
-                    <span class="size-2.5 rounded-full bg-green-500"></span>
-                    <span class="font-semibold text-black/80 dark:text-white/80">Healthy</span>
-                    <span class="ml-auto text-black/60 dark:text-white/60">{{ latestHealthy }}%</span>
-                  </div>
-                  <div class="flex items-center gap-2 rounded-lg bg-primary/10 p-3 dark:bg-primary/20">
-                    <span class="size-2.5 rounded-full bg-red-500"></span>
-                    <span class="font-semibold text-black/80 dark:text-white/80">Critical</span>
-                    <span class="ml-auto text-black/60 dark:text-white/60">{{ latestCritical }}%</span>
-                  </div>
+              <div class="grid grid-cols-2 gap-3 text-sm">
+                <div
+                  class="flex items-center gap-2 rounded-lg bg-primary/10 p-3 dark:bg-primary/20"
+                >
+                  <span class="size-2.5 rounded-full bg-red-500"></span>
+                  <span class="font-semibold text-black/80 dark:text-white/80">최근 값</span>
+                  <span class="ml-auto text-black/60 dark:text-white/60">{{ latestAnomaly }}</span>
                 </div>
-
-                <p class="text-xs text-black/50 dark:text-white/50">
-                  베어링 상태별 온도 추이는 Healthy 비중이 안정적이며 Critical 구간에 대한 선제
-                  점검이 필요합니다.
-                </p>
+                <div
+                  class="flex items-center gap-2 rounded-lg bg-primary/10 p-3 dark:bg-primary/20"
+                >
+                  <span class="font-semibold text-black/80 dark:text-white/80">최신 시각</span>
+                  <span class="ml-auto text-black/60 dark:text-white/60">{{
+                    latestAnomalyLabel
+                  }}</span>
+                </div>
               </div>
             </div>
           </div>
 
-          <h2 class="px-4 pb-3 pt-8 text-2xl font-bold">Predictive Maintenance</h2>
+          <h2 class="px-4 pb-3 pt-8 text-2xl font-bold">예지 보전</h2>
           <div class="px-4 py-3 @container">
             <div
               class="overflow-hidden rounded-xl border border-primary/20 bg-background-light dark:border-primary/30 dark:bg-background-dark"
@@ -221,8 +245,8 @@
                 <table class="w-full text-left">
                   <thead class="bg-primary/10 dark:bg-primary/20">
                     <tr>
-                      <th class="px-6 py-4 text-sm font-medium">Bearing ID</th>
-                      <th class="px-6 py-4 text-sm font-medium">Status</th>
+                      <th class="px-6 py-4 text-sm font-medium">베어링 ID</th>
+                      <th class="px-6 py-4 text-sm font-medium">상태</th>
                     </tr>
                   </thead>
                   <tbody class="divide-y divide-primary/20 dark:divide-primary/30">
@@ -246,95 +270,107 @@
 </template>
 
 <script setup>
+/** 상단 네비게이션(한국어만 노출) */
 const navigation = [
-  { label: 'Overview' },
-  { label: 'Analysis' },
-  { label: 'Alerts' },
-  { label: 'Reports' },
+  { label: '개요' }, // Overview
+  { label: '리포트' }, // Reports
 ]
 
+/** 요약 카드(한국어) */
 const summaryCards = [
-  { label: 'Total Bearings', value: '1,250' },
-  { label: 'Active Alerts', value: '15' },
-  { label: 'Predictions', value: '30' },
+  { label: '총 베어링 수', value: '1,250' },
+  { label: '활성 알림', value: '15' },
+  { label: '예측 수', value: '30' },
 ]
 
-const bearingConditionSummary = { percentage: 75, delta: 5 }
+/** 공통 차트 크기 */
+const chartConfig = { width: 260, height: 120 }
 
-const bearingConditionSegments = [
-  { label: 'Healthy', height: 75 },
-  { label: 'Critical', height: 25 },
+/** (3) PMS 결과: 1시간 단위 선그래프용 더미 데이터 (최근 12시간) */
+const pmsHourlyData = [
+  { label: '04시', value: 72 },
+  { label: '05시', value: 75 },
+  { label: '06시', value: 78 },
+  { label: '07시', value: 74 },
+  { label: '08시', value: 80 },
+  { label: '09시', value: 83 },
+  { label: '10시', value: 79 },
+  { label: '11시', value: 81 },
+  { label: '12시', value: 77 },
+  { label: '13시', value: 82 },
+  { label: '14시', value: 85 },
+  { label: '15시', value: 84 },
 ]
 
-const temperatureSummary = {
-  current: '25°C',
-  change: -2,
-  changeLabel: '-2%',
-}
-
-const temperatureTrendData = [
-  { label: '10/11', healthy: 82, critical: 18 },
-  { label: '10/12', healthy: 80, critical: 20 },
-  { label: '10/13', healthy: 77, critical: 23 },
-  { label: '10/14', healthy: 79, critical: 21 },
-  { label: '10/15', healthy: 81, critical: 19 },
-  { label: '10/16', healthy: 78, critical: 22 },
-  { label: '10/17', healthy: 76, critical: 24 },
+/** (4) 이상 신호 탐지: 0/1, 1시간 단위 선그래프용 더미 데이터 (최근 12시간) */
+const anomalyHourlyData = [
+  { label: '04시', value: 0 },
+  { label: '05시', value: 0 },
+  { label: '06시', value: 1 },
+  { label: '07시', value: 0 },
+  { label: '08시', value: 0 },
+  { label: '09시', value: 0 },
+  { label: '10시', value: 1 },
+  { label: '11시', value: 0 },
+  { label: '12시', value: 0 },
+  { label: '13시', value: 0 },
+  { label: '14시', value: 1 },
+  { label: '15시', value: 0 },
 ]
 
-const chartConfig = { width: 240, height: 120 }
-
-const computeSeries = (key) => {
-  if (temperatureTrendData.length <= 1) {
-    const fallbackValue = temperatureTrendData[0]?.[key] ?? 0
-    const y = chartConfig.height - (fallbackValue / 100) * chartConfig.height
+/** 일반 값(%) 선그래프 좌표 생성 */
+const buildSeries = (items, key = 'value', maxY = 100) => {
+  if (!items?.length) return { points: '', coordinates: [] }
+  if (items.length === 1) {
+    const v = items[0][key] ?? 0
+    const y = chartConfig.height - (v / maxY) * chartConfig.height
     return {
       points: `0,${y} ${chartConfig.width},${y}`,
       coordinates: [
-        { x: 0, y, value: fallbackValue, label: temperatureTrendData[0]?.label ?? 'now' },
-        { x: chartConfig.width, y, value: fallbackValue, label: temperatureTrendData[0]?.label ?? 'now' },
+        { x: 0, y, value: v, label: items[0].label },
+        { x: chartConfig.width, y, value: v, label: items[0].label },
       ],
     }
   }
-
-  const coordinates = temperatureTrendData.map((point, index) => {
-    const x = (index / (temperatureTrendData.length - 1)) * chartConfig.width
-    const y = chartConfig.height - (point[key] / 100) * chartConfig.height
-    return { x, y, value: point[key], label: point.label }
+  const coordinates = items.map((p, i) => {
+    const x = (i / (items.length - 1)) * chartConfig.width
+    const y = chartConfig.height - ((p[key] ?? 0) / maxY) * chartConfig.height
+    return { x, y, value: p[key] ?? 0, label: p.label }
   })
-
   return {
     points: coordinates.map(({ x, y }) => `${x},${y}`).join(' '),
     coordinates,
   }
 }
 
-const healthySeries = computeSeries('healthy')
-const criticalSeries = computeSeries('critical')
+/** 0/1 이진값 선그래프 좌표 생성 */
+const buildBinarySeries = (items) => buildSeries(items, 'value', 1)
 
-const latestTrend = temperatureTrendData[temperatureTrendData.length - 1] ?? {
-  healthy: 0,
-  critical: 0,
-}
+/** 시리즈 계산 */
+const pmsSeries = buildSeries(pmsHourlyData, 'value', 100)
+const anomalySeries = buildBinarySeries(anomalyHourlyData)
 
-const latestHealthy = latestTrend.healthy
-const latestCritical = latestTrend.critical
+/** 최신값 표시 */
+const latestPms = pmsHourlyData.at(-1)?.value ?? 0
+const latestPmsLabel = pmsHourlyData.at(-1)?.label ?? '-'
+const latestAnomaly = anomalyHourlyData.at(-1)?.value ?? 0
+const latestAnomalyLabel = anomalyHourlyData.at(-1)?.label ?? '-'
 
+/** 예지 보전 테이블(한국어 상태) */
 const predictiveRows = [
-  { id: 'B001', status: 'Healthy' },
-  { id: 'B002', status: 'Critical' },
-  { id: 'B003', status: 'Healthy' },
-  { id: 'B004', status: 'Critical' },
-  { id: 'B005', status: 'Healthy' },
+  { id: 'B001', status: '양호' },
+  { id: 'B002', status: '위험' },
+  { id: 'B003', status: '양호' },
+  { id: 'B004', status: '위험' },
+  { id: 'B005', status: '양호' },
 ]
 
+/** 상태 칩 스타일 */
 const statusChipBase = 'inline-flex items-center px-3 py-1 rounded-full text-xs font-medium'
-
 const statusChipVariants = {
-  Healthy: `${statusChipBase} bg-green-500/20 text-green-800 dark:bg-green-500/30 dark:text-green-300`,
-  Critical: `${statusChipBase} bg-red-500/20 text-red-800 dark:bg-red-500/30 dark:text-red-300`,
+  양호: `${statusChipBase} bg-green-500/20 text-green-800 dark:bg-green-500/30 dark:text-green-300`,
+  위험: `${statusChipBase} bg-red-500/20 text-red-800 dark:bg-red-500/30 dark:text-red-300`,
 }
-
 const getStatusChipClass = (status) => statusChipVariants[status] ?? statusChipBase
 </script>
 
