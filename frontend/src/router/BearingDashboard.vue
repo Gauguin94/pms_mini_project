@@ -150,7 +150,7 @@
               </div>
             </div>
 
-            <!-- (4) 이상 신호 탐지: 0/1, 1시간 단위 선그래프 -->
+            <!-- (4) 이상 신호 탐지: 0/1, 1시간 단위 스퀘어(계단) 선그래프 -->
             <div
               class="flex flex-col gap-4 rounded-xl border border-primary/20 bg-background-light p-6 dark:border-primary/30 dark:bg-background-dark"
             >
@@ -169,27 +169,19 @@
                       <stop offset="100%" stop-color="#f97316" />
                     </linearGradient>
                   </defs>
+
+                  <!-- 스퀘어(계단) 파형: 선만 표시 -->
                   <polyline
                     :points="anomalySeries.points"
                     fill="none"
                     stroke="url(#anomalyStroke)"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
+                    stroke-linecap="butt"
+                    stroke-linejoin="miter"
                     stroke-width="3"
+                    shape-rendering="crispEdges"
                   />
-                  <g>
-                    <circle
-                      v-for="pt in anomalySeries.coordinates"
-                      :key="`ano-${pt.label}`"
-                      :cx="pt.x"
-                      :cy="pt.y"
-                      r="3"
-                      class="drop-shadow-sm"
-                      :fill="pt.value === 1 ? '#ef4444' : '#10b981'"
-                    />
-                  </g>
 
-                  <!-- 좌측 축(0/1 안내선) -->
+                  <!-- 좌측 0/1 가이드 라인(옵션) -->
                   <line
                     x1="0"
                     :y1="chartConfig.height"
@@ -302,7 +294,7 @@ const pmsHourlyData = [
   { label: '15시', value: 84 },
 ]
 
-/** (4) 이상 신호 탐지: 0/1, 1시간 단위 선그래프용 더미 데이터 (최근 12시간) */
+/** (4) 이상 신호 탐지: 0/1, 1시간 단위 스퀘어 파형용 더미 데이터 (최근 12시간) */
 const anomalyHourlyData = [
   { label: '04시', value: 0 },
   { label: '05시', value: 0 },
@@ -343,12 +335,45 @@ const buildSeries = (items, key = 'value', maxY = 100) => {
   }
 }
 
-/** 0/1 이진값 선그래프 좌표 생성 */
-const buildBinarySeries = (items) => buildSeries(items, 'value', 1)
+/** (핵심) 0/1 데이터를 스퀘어(계단) 파형으로 변환 */
+const buildBinaryStepSeries = (items) => {
+  if (!items?.length) return { points: '', coordinates: [] }
+  const padTop = 2 // 위 여백
+  const padBottom = 2 // 아래 여백
+  const yFor = (v) => (v === 1 ? padTop : chartConfig.height - padBottom)
+
+  const coords = []
+  // 시작점
+  coords.push({
+    x: 0,
+    y: yFor(items[0].value ?? 0),
+    value: items[0].value ?? 0,
+    label: items[0].label,
+  })
+
+  for (let i = 1; i < items.length; i++) {
+    const x = (i / (items.length - 1)) * chartConfig.width
+    const prev = items[i - 1]
+    const curr = items[i]
+    const prevY = yFor(prev.value ?? 0)
+    const currY = yFor(curr.value ?? 0)
+
+    // 수평 구간: 이전 값으로 현재 x까지
+    coords.push({ x, y: prevY, value: prev.value ?? 0, label: curr.label + '-h' })
+    // 값이 달라지면 같은 x에서 수직 점프
+    if (currY !== prevY) coords.push({ x, y: currY, value: curr.value ?? 0, label: curr.label })
+    else coords.push({ x, y: currY, value: curr.value ?? 0, label: curr.label })
+  }
+
+  return {
+    points: coords.map(({ x, y }) => `${x},${y}`).join(' '),
+    coordinates: coords,
+  }
+}
 
 /** 시리즈 계산 */
 const pmsSeries = buildSeries(pmsHourlyData, 'value', 100)
-const anomalySeries = buildBinarySeries(anomalyHourlyData)
+const anomalySeries = buildBinaryStepSeries(anomalyHourlyData)
 
 /** 최신값 표시 */
 const latestPms = pmsHourlyData.at(-1)?.value ?? 0
