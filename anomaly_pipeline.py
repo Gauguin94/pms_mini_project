@@ -28,7 +28,6 @@ from dotenv import load_dotenv
 from pymysql.cursors import DictCursor
 from torch.utils.data import DataLoader
 
-
 load_dotenv()
 
 ROOT_DIR = Path(__file__).resolve().parent
@@ -108,7 +107,6 @@ def _db_connection():
         conn.close()
 
 
-
 def _save_llm_report(offset: int, mae: float, suspect: Optional[str], report: Dict) -> None:
     create_sql = """
     CREATE TABLE IF NOT EXISTS pms_ai_advice (
@@ -137,6 +135,7 @@ def _save_llm_report(offset: int, mae: float, suspect: Optional[str], report: Di
             ))
         conn.commit()
 
+
 def _guess_fault_type(row: Dict[str, object]) -> Optional[str]:
     for k in ["bearing", "misalignment", "unbalance", "rotor", "cavitation", "vane"]:
         try:
@@ -145,6 +144,7 @@ def _guess_fault_type(row: Dict[str, object]) -> Optional[str]:
         except Exception:
             pass
     return None
+
 
 def _trigger_llm_async(row: Dict[str, object], mae: float, offset: int):
     """한 번이라도 이상이면 백그라운드로 LLM 실행 + 저장 (쿨다운 포함)"""
@@ -410,18 +410,6 @@ def main_loop(interval_seconds: int = SLEEP_SECONDS) -> None:
             time.sleep(interval_seconds)
 
 
-
-
-
-
-
-
-
-
-
-
-
-
 def _save_rag(offset: int, mae: float, suspect: Optional[str], report: Dict) -> None:
     create_sql = """
     CREATE TABLE IF NOT EXISTS pms_ai_rag_advice (
@@ -464,16 +452,6 @@ def _trigger_llm_async(row: Dict[str, object], mae: float, offset: int):
         except Exception as e:
             print("[RAG][ERROR]", e)
     threading.Thread(target=_job_rag, daemon=True).start()
-
-
-
-
-
-
-
-
-
-
 
 
 # === [추가] 재학습 로깅 유틸 ===
@@ -546,29 +524,6 @@ def run_retrain_with_logging():
         _retrain_log_append(log_id, f"[에러] {repr(e)}", "ERROR")
         _retrain_log_finish(log_id, "failed", str(e))
         raise
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 if __name__ == "__main__":

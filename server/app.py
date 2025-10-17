@@ -226,8 +226,7 @@ def realtime_count():
         with conn.cursor() as cur:
             cur.execute("SELECT COUNT(*) AS cnt FROM realtime_table;")
             return {"count": int(cur.fetchone()["cnt"])}
-        
-        
+
 
 class AdviceBrief(BaseModel):
     id: int
