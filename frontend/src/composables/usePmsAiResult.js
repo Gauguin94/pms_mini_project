@@ -3,12 +3,14 @@
  * 단일 베어링 AI 결과 데이터 관리
  */
 
-import { ref } from 'vue'
+import { ref, shallowRef } from 'vue'
 import { pmsAiResultApi } from '@/services/api'
+import { useAutoRefresh } from './useAutoRefresh'
 
 export function usePmsAiResult() {
-  // State
-  const aiResults = ref([])
+  // State (shallowRef로 렌더링 최적화)
+  const aiResults = shallowRef([])
+
   const loading = ref(false)
   const error = ref(null)
 
@@ -148,15 +150,25 @@ export function usePmsAiResult() {
     return hourlyData
   }
 
+  // 자동 갱신 설정 (1분마다)
+  const { isRefreshing, lastUpdated, startAutoRefresh, stopAutoRefresh } = useAutoRefresh(
+    () => fetchAiResults(500),
+    60000, // 60초 = 1분
+  )
+
   return {
     // State
     aiResults,
     loading,
     error,
+    isRefreshing,
+    lastUpdated,
 
     // Methods
     fetchAiResults,
     getMinuteData,
     getHourlyData,
+    startAutoRefresh,
+    stopAutoRefresh,
   }
 }

@@ -16,14 +16,24 @@ export const pmsAiResultApi = {
    */
   async getSingleBearingResults(limit = 50) {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/airesult/single?limit=${limit}`)
+      const response = await fetch(`${API_BASE_URL}/api/airesult/single?limit=${limit}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      })
 
       if (!response.ok) {
-        throw new Error(`API 호출 실패: ${response.status}`)
+        throw new Error(`API 호출 실패: ${response.status} ${response.statusText}`)
       }
 
       return await response.json()
     } catch (error) {
+      // 네트워크 에러 (백엔드 미실행)
+      if (error.message.includes('Failed to fetch')) {
+        console.error('❌ 백엔드 서버에 연결할 수 없습니다. http://localhost:8080 확인 필요')
+        throw new Error('백엔드 서버에 연결할 수 없습니다.')
+      }
       console.error('PMS AI Result API 호출 에러:', error)
       throw error
     }

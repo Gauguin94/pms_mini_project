@@ -11,10 +11,42 @@
         <div class="layout-content-container flex flex-col w-full max-w-6xl">
           <!-- Title -->
           <div class="flex flex-col gap-2 p-4">
-            <h1 class="text-black dark:text-white text-3xl font-bold">베어링 모니터링 대시보드</h1>
-            <p class="text-black/60 dark:text-white/60 text-base font-normal leading-normal">
-              베어링 상태 및 예측 분석에 대한 실시간 정보입니다.
-            </p>
+            <div class="flex items-center justify-between">
+              <div>
+                <h1 class="text-black dark:text-white text-3xl font-bold">
+                  베어링 모니터링 대시보드
+                </h1>
+                <p class="text-black/60 dark:text-white/60 text-base font-normal leading-normal">
+                  베어링 상태 및 예측 분석에 대한 실시간 정보입니다.
+                </p>
+              </div>
+              <RefreshIndicator
+                :is-refreshing="isRefreshing"
+                :last-updated="lastUpdated"
+                @refresh="fetchAiResults(500)"
+              />
+            </div>
+
+            <!-- 에러 메시지 -->
+            <div
+              v-if="error"
+              class="mt-4 p-4 bg-red-500/10 border border-red-500/50 rounded-lg flex items-center gap-3"
+            >
+              <span class="material-symbols-outlined text-red-500">error</span>
+              <div class="flex-1">
+                <p class="text-red-700 dark:text-red-300 font-medium">연결 오류</p>
+                <p class="text-red-600 dark:text-red-400 text-sm">{{ error }}</p>
+                <p class="text-red-600 dark:text-red-400 text-xs mt-1">
+                  백엔드 서버가 실행 중인지 확인하세요: http://localhost:8080
+                </p>
+              </div>
+              <button
+                @click="fetchAiResults(500)"
+                class="px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors"
+              >
+                재시도
+              </button>
+            </div>
           </div>
 
           <!-- Summary Cards -->
@@ -77,19 +109,35 @@ import BinaryStateChart from '@/components/dashboard/BinaryStateChart.vue'
 import BearingStatusCard from '@/components/dashboard/BearingStatusCard.vue'
 import RetrainTable from '@/components/dashboard/RetrainTable.vue'
 import LogViewer from '@/components/dashboard/LogViewer.vue'
+import RefreshIndicator from '@/components/dashboard/RefreshIndicator.vue'
 import { usePmsAiResult } from '@/composables/usePmsAiResult'
 import { useBearingStatus } from '@/composables/useBearingStatus'
 
 // PMS AI Result API 연결
-const { aiResults, loading, error, fetchAiResults, getMinuteData } = usePmsAiResult()
+const {
+  aiResults,
+  loading,
+  error,
+  fetchAiResults,
+  getMinuteData,
+  isRefreshing,
+  lastUpdated,
+  startAutoRefresh,
+  stopAutoRefresh,
+} = usePmsAiResult()
 
 // 베어링 상태 관리
 const { bearings } = useBearingStatus(aiResults)
 
-// 컴포넌트 마운트 시 데이터 로드
+console.log(bearings.value)
+
+// 컴포넌트 마운트 시 데이터 로드 및 자동 갱신 시작
 onMounted(async () => {
-  await fetchAiResults(500) // 500개 데이터 로드
+  await fetchAiResults(500) // 초기 데이터 로드
+  startAutoRefresh() // 1분마다 자동 갱신 시작
 })
+
+// 컴포넌트 언마운트 시 자동 갱신 중지 (자동으로 처리됨)
 
 // 분 단위 데이터 가져오기 (60분)
 const minuteData = computed(() => getMinuteData(60))
