@@ -137,16 +137,22 @@ onMounted(async () => {
 
 const minuteData = computed(() => getMinuteData(60))
 
-// Time Labels (분 단위 - 5분 간격으로 표시)
+// Time Labels (현재 시간 기준 - 5분 간격으로 표시)
 const timeLabels = computed(() => {
+  const now = new Date()
   const labels = []
+
   for (let i = 0; i < 60; i += 5) {
-    labels.push(`${i}분`)
+    const targetTime = new Date(now.getTime() - (60 - i) * 60 * 1000)
+    const hours = targetTime.getHours()
+    const minutes = targetTime.getMinutes()
+    labels.push(`${hours}:${String(minutes).padStart(2, '0')}`)
   }
+
   return labels
 })
 
-// Summary Cards Data (실제 데이터 기반)
+// Summary Cards Data
 const summaryCards = computed(() => {
   const abnormalCount = aiResults.value.filter((r) => r.result === 1).length
   const totalCount = aiResults.value.length
