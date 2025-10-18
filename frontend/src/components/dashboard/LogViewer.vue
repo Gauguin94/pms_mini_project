@@ -95,17 +95,6 @@ const formatTime = (timestamp) => {
 }
 
 /**
-
-// logId 변경 시 로그 다시 가져오기
-watch(() => props.logId, fetchLogs, { immediate: true })
-
-// 컴포넌트 마운트 시 로그 가져오기
-onMounted(() => {
-  if (props.logId) {
-    fetchLogs()
-  }
-})
-
  * 로그 레벨에 따른 CSS 클래스
  */
 const getLevelClass = (level) => {
@@ -120,4 +109,16 @@ const getLevelClass = (level) => {
       return 'text-gray-400'
   }
 }
+
+// logId 변경 시 로그 다시 가져오기
+watch(
+  () => props.logId,
+  (newLogId) => {
+    console.log('🔍 logId 변경 감지:', newLogId)
+    if (newLogId) {
+      fetchLogs()
+    }
+  },
+  { immediate: true },
+)
 </script>
