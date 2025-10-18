@@ -92,7 +92,7 @@
             <RetrainTable :logs="retrainLogs" @view-log="handleViewLog" />
 
             <!-- Log Details -->
-            <LogViewer :log-id="selectedLog" :log-lines="logDetails" />
+            <LogViewer :log-id="selectedLog" :limit="20" />
           </div>
         </div>
       </main>
@@ -129,7 +129,7 @@ const {
 // 베어링 상태 관리
 const { bearings } = useBearingStatus(aiResults)
 
-console.log(bearings.value)
+console.log(barings.value)
 
 // 컴포넌트 마운트 시 데이터 로드 및 자동 갱신 시작
 onMounted(async () => {
@@ -155,7 +155,6 @@ const timeLabels = computed(() => {
 const summaryCards = computed(() => {
   const abnormalCount = aiResults.value.filter((r) => r.result === 1).length
   const totalCount = aiResults.value.length
-  console.log(totalCount)
 
   return [
     { label: '총 베어링 수', value: '1' }, // 단일 베어링
@@ -177,40 +176,29 @@ const retrainLogs = [
     message: '재학습이 성공적으로 완료되었습니다.',
   },
   {
-    id: 'run-20230520-1',
-    startTime: '2023-05-20 14:30:00',
-    endTime: '2023-05-20 14:40:10',
-    status: 'Failed',
-    statusClass:
-      'inline-flex items-center rounded-md bg-red-500/10 px-2 py-1 text-xs font-medium text-red-700 dark:bg-red-500/20 dark:text-red-300',
-    duration: '10m 10s',
-    message: '데이터 전처리 중 오류가 발생했습니다.',
-  },
-  {
-    id: 'run-20230519-2',
-    startTime: '2023-05-19 09:00:00',
-    endTime: '2023-05-19 09:20:05',
+    id: 2,
+    startTime: '2025-10-15 06:55:48',
+    endTime: '2025-10-15 06:55:50',
     status: 'Success',
     statusClass:
       'inline-flex items-center rounded-md bg-green-500/10 px-2 py-1 text-xs font-medium text-green-700 dark:bg-green-500/20 dark:text-green-300',
-    duration: '20m 5s',
+    duration: '2s',
+    message: '재학습이 성공적으로 완료되었습니다.',
+  },
+  {
+    id: 1,
+    startTime: '2025-10-15 04:40:33',
+    endTime: '2025-10-15 04:40:34',
+    status: 'Success',
+    statusClass:
+      'inline-flex items-center rounded-md bg-green-500/10 px-2 py-1 text-xs font-medium text-green-700 dark:bg-green-500/20 dark:text-green-300',
+    duration: '1s',
     message: '재학습이 성공적으로 완료되었습니다.',
   },
 ]
 
-// Selected Log
-const selectedLog = ref('run-20230520-1')
-
-// Log Details
-const logDetails = [
-  '<span class="text-gray-500">[2023-05-20 14:30:00]</span> <span class="text-blue-400">[정보]</span> run-20230520-1에 대한 재학습 프로세스를 시작합니다.',
-  '<span class="text-gray-500">[2023-05-20 14:30:05]</span> <span class="text-blue-400">[정보]</span> 데이터셋을 로드하는 중...',
-  '<span class="text-gray-500">[2023-05-20 14:32:15]</span> <span class="text-blue-400">[정보]</span> 데이터셋을 성공적으로 로드했습니다.',
-  '<span class="text-gray-500">[2023-05-20 14:32:20]</span> <span class="text-blue-400">[정보]</span> 데이터 전처리를 시작합니다.',
-  '<span class="text-gray-500">[2023-05-20 14:35:50]</span> <span class="text-yellow-400">[경고]</span> sensor_data_B002에서 누락된 값을 발견했습니다. 평균값으로 대체합니다.',
-  '<span class="text-gray-500">[2023-05-20 14:40:05]</span> <span class="text-red-400">[오류]</span> 전처리 단계에서 치명적인 오류 발생: \'temperature\' 특성에 대한 데이터 유형이 호환되지 않습니다. 예상 유형: float, 실제 유형: string.',
-  '<span class="text-gray-500">[2023-05-20 14:40:10]</span> <span class="text-red-400">[오류]</span> 재학습 프로세스가 실패했습니다.',
-]
+// Selected Log (초기값 null, 사용자가 "로그 보기" 버튼 클릭 시 설정됨)
+const selectedLog = ref(null)
 
 // Handle View Log
 const handleViewLog = (logId) => {
