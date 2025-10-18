@@ -33,127 +33,10 @@
           </h2>
           <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 px-4 py-6">
             <!-- Chart 1: PMS 이상 탐지 -->
-            <ChartCard title="PMS 이상 탐지 (점수) 또는 센서 신호값">
-              <template #content>
-                <div class="flex items-baseline gap-3">
-                  <p class="text-black dark:text-white text-4xl font-bold">1800</p>
-                  <p class="text-red-500 text-base font-medium">+5%</p>
-                </div>
-                <p class="text-black/60 dark:text-white/60 text-sm font-normal">지난 24시간</p>
-                <div class="flex flex-1 gap-4 py-4 h-48">
-                  <div
-                    class="flex flex-col justify-between text-black/60 dark:text-white/60 text-xs font-bold uppercase tracking-wider"
-                  >
-                    <p>2000</p>
-                    <p>1000</p>
-                    <p>0</p>
-                    <p>-200</p>
-                  </div>
-                  <div class="flex-1 flex flex-col gap-4">
-                    <svg
-                      fill="none"
-                      height="100%"
-                      preserveAspectRatio="none"
-                      viewBox="0 0 472 150"
-                      width="100%"
-                      xmlns="http://www.w3.org/2000/svg"
-                    >
-                      <path
-                        d="M0 109C18.1538 109 18.1538 21 36.3077 21C54.4615 21 54.4615 41 72.6154 41C90.7692 41 90.7692 93 108.923 93C127.077 93 127.077 33 145.231 33C163.385 33 163.385 101 181.538 101C199.692 101 199.692 61 217.846 61C236 61 236 45 254.154 45C272.308 45 272.308 121 290.462 121C308.615 121 308.615 149 326.769 149C344.923 149 344.923 1 363.077 1C381.231 1 381.231 81 399.385 81C417.538 81 417.538 129 435.692 129C453.846 129 453.846 25 472 25V149H0V109Z"
-                        fill="url(#paint0_linear_chart)"
-                      ></path>
-                      <path
-                        d="M0 109C18.1538 109 18.1538 21 36.3077 21C54.4615 21 54.4615 41 72.6154 41C90.7692 41 90.7692 93 108.923 93C127.077 93 127.077 33 145.231 33C163.385 33 163.385 101 181.538 101C199.692 101 199.692 61 217.846 61C236 61 236 45 254.154 45C272.308 45 272.308 121 290.462 121C308.615 121 308.615 149 326.769 149C344.923 149 344.923 1 363.077 1C381.231 1 381.231 81 399.385 81C417.538 81 417.538 129 435.692 129C453.846 129 453.846 25 472 25"
-                        stroke="#1193d4"
-                        stroke-linecap="round"
-                        stroke-width="3"
-                      ></path>
-                      <defs>
-                        <linearGradient
-                          gradientUnits="userSpaceOnUse"
-                          id="paint0_linear_chart"
-                          x1="236"
-                          x2="236"
-                          y1="1"
-                          y2="149"
-                        >
-                          <stop stop-color="#1193d4" stop-opacity="0.3"></stop>
-                          <stop offset="1" stop-color="#1193d4" stop-opacity="0"></stop>
-                        </linearGradient>
-                      </defs>
-                    </svg>
-                    <div class="flex justify-around">
-                      <p
-                        v-for="time in timeLabels"
-                        :key="time"
-                        class="text-black/60 dark:text-white/60 text-xs font-bold uppercase tracking-wider"
-                      >
-                        {{ time }}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </template>
-            </ChartCard>
+            <SensorSignalChart :time-labels="timeLabels" />
 
             <!-- Chart 2: 베어링 상태 분포 (Binary) -->
-            <ChartCard>
-              <template #header>
-                <div class="flex flex-col gap-1">
-                  <p class="text-black dark:text-white text-lg font-medium">베어링 상태 분포</p>
-                  <p class="text-black/60 dark:text-white/60 text-sm font-normal">
-                    베어링 상태의 이진 시각화 (0: 정상, 1: 이상).
-                  </p>
-                </div>
-              </template>
-              <template #content>
-                <div class="flex items-center gap-4">
-                  <div class="flex items-center gap-2">
-                    <div class="h-4 w-4 rounded-sm bg-green-500/20 dark:bg-green-500/30"></div>
-                    <p class="text-black/80 dark:text-white/80 text-sm">정상</p>
-                  </div>
-                  <div class="flex items-center gap-2">
-                    <div class="relative h-4 w-4 flex items-center justify-center">
-                      <div class="h-0.5 w-full bg-blue-600"></div>
-                    </div>
-                    <p class="text-black/80 dark:text-white/80 text-sm">이상</p>
-                  </div>
-                </div>
-                <div class="flex flex-1 gap-4 pt-4 h-48">
-                  <div
-                    class="flex flex-col justify-between text-black/60 dark:text-white/60 text-xs font-bold uppercase tracking-wider h-full pb-8"
-                  >
-                    <p>1</p>
-                    <p>0</p>
-                  </div>
-                  <div class="flex-1 flex flex-col gap-4">
-                    <svg
-                      class="flex-1 rounded-md bg-zinc-100 dark:bg-zinc-800"
-                      fill="none"
-                      preserveAspectRatio="none"
-                      viewBox="0 0 475 150"
-                      xmlns="http://www.w3.org/2000/svg"
-                    >
-                      <path
-                        d="M0 149L109.615 149L109.615 1L219.231 1L219.231 149L292.308 149L292.308 1L438.462 1L438.462 149L475 149"
-                        stroke="#2563eb"
-                        stroke-linecap="round"
-                        stroke-width="3"
-                      ></path>
-                    </svg>
-                    <div class="flex justify-around">
-                      <p
-                        v-for="time in timeLabels"
-                        :key="time"
-                        class="text-black/60 dark:text-white/60 text-xs font-bold uppercase tracking-wider"
-                      >
-                        {{ time }}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </template>
-            </ChartCard>
+            <BinaryStateChart :minute-data="minuteData" :time-labels="timeLabels" />
           </div>
 
           <!-- Predictive Maintenance Section -->
@@ -186,99 +69,52 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import DashboardHeader from '@/components/dashboard/DashboardHeader.vue'
 import SummaryCard from '@/components/dashboard/SummaryCard.vue'
-import ChartCard from '@/components/dashboard/ChartCard.vue'
+import SensorSignalChart from '@/components/dashboard/SensorSignalChart.vue'
+import BinaryStateChart from '@/components/dashboard/BinaryStateChart.vue'
 import BearingStatusCard from '@/components/dashboard/BearingStatusCard.vue'
 import RetrainTable from '@/components/dashboard/RetrainTable.vue'
 import LogViewer from '@/components/dashboard/LogViewer.vue'
+import { usePmsAiResult } from '@/composables/usePmsAiResult'
+import { useBearingStatus } from '@/composables/useBearingStatus'
 
-// Time Labels
-const timeLabels = ['00:00', '04:00', '08:00', '12:00', '16:00', '20:00', '24:00']
+// PMS AI Result API 연결
+const { aiResults, loading, error, fetchAiResults, getMinuteData } = usePmsAiResult()
 
-// Summary Cards Data
-const summaryCards = [
-  { label: '총 베어링 수', value: '1,250' },
-  { label: '활성 알림', value: '15' },
-  { label: '예측', value: '30' },
-]
+// 베어링 상태 관리
+const { bearings } = useBearingStatus(aiResults)
 
-// Bearings Data
-const bearings = [
-  {
-    id: 'B001',
-    status: '정상',
-    icon: 'check_circle',
-    statusClass: 'border-green-500/50 bg-green-500/10 dark:bg-green-500/20',
-    iconBgClass: 'bg-green-500/20',
-    iconColorClass: 'text-green-500',
-    textClass: 'text-sm text-green-700 dark:text-green-300',
-  },
-  {
-    id: 'B002',
-    status: '이상 감지',
-    icon: 'warning',
-    statusClass: 'border-yellow-500/50 bg-yellow-500/10 dark:bg-yellow-500/20',
-    iconBgClass: 'bg-yellow-500/20',
-    iconColorClass: 'text-yellow-500',
-    textClass: 'text-sm text-yellow-700 dark:text-yellow-300',
-  },
-  {
-    id: 'B003',
-    status: '수리 중',
-    icon: 'build',
-    statusClass: 'border-blue-500/50 bg-blue-500/10 dark:bg-blue-500/20',
-    iconBgClass: 'bg-blue-500/20',
-    iconColorClass: 'text-blue-500',
-    textClass: 'text-sm text-blue-700 dark:text-blue-300',
-  },
-  {
-    id: 'B004',
-    status: '위험',
-    icon: 'error',
-    statusClass: 'border-red-500/50 bg-red-500/10 dark:bg-red-500/20',
-    iconBgClass: 'bg-red-500/20',
-    iconColorClass: 'text-red-500',
-    textClass: 'text-sm text-red-700 dark:text-red-300',
-  },
-  {
-    id: 'B005',
-    status: '정상',
-    icon: 'check_circle',
-    statusClass: 'border-green-500/50 bg-green-500/10 dark:bg-green-500/20',
-    iconBgClass: 'bg-green-500/20',
-    iconColorClass: 'text-green-500',
-    textClass: 'text-sm text-green-700 dark:text-green-300',
-  },
-  {
-    id: 'B006',
-    status: '정상',
-    icon: 'check_circle',
-    statusClass: 'border-green-500/50 bg-green-500/10 dark:bg-green-500/20',
-    iconBgClass: 'bg-green-500/20',
-    iconColorClass: 'text-green-500',
-    textClass: 'text-sm text-green-700 dark:text-green-300',
-  },
-  {
-    id: 'B007',
-    status: '이상 감지',
-    icon: 'warning',
-    statusClass: 'border-yellow-500/50 bg-yellow-500/10 dark:bg-yellow-500/20',
-    iconBgClass: 'bg-yellow-500/20',
-    iconColorClass: 'text-yellow-500',
-    textClass: 'text-sm text-yellow-700 dark:text-yellow-300',
-  },
-  {
-    id: 'B008',
-    status: '정상',
-    icon: 'check_circle',
-    statusClass: 'border-green-500/50 bg-green-500/10 dark:bg-green-500/20',
-    iconBgClass: 'bg-green-500/20',
-    iconColorClass: 'text-green-500',
-    textClass: 'text-sm text-green-700 dark:text-green-300',
-  },
-]
+// 컴포넌트 마운트 시 데이터 로드
+onMounted(async () => {
+  await fetchAiResults(500) // 500개 데이터 로드
+})
+
+// 분 단위 데이터 가져오기 (60분)
+const minuteData = computed(() => getMinuteData(60))
+
+// Time Labels (분 단위 - 5분 간격으로 표시)
+const timeLabels = computed(() => {
+  const labels = []
+  for (let i = 0; i < 60; i += 5) {
+    labels.push(`${i}분`)
+  }
+  return labels
+})
+
+// Summary Cards Data (실제 데이터 기반)
+const summaryCards = computed(() => {
+  const abnormalCount = aiResults.value.filter((r) => r.result === 1).length
+  const totalCount = aiResults.value.length
+  console.log(totalCount)
+
+  return [
+    { label: '총 베어링 수', value: '1' }, // 단일 베어링
+    { label: '활성 알림', value: abnormalCount.toString() },
+    { label: '예측 수', value: totalCount.toString() },
+  ]
+})
 
 // Retrain Logs Data
 const retrainLogs = [
