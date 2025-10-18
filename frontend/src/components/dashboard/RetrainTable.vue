@@ -33,13 +33,6 @@
             </td>
             <td class="px-6 py-4">{{ log.duration }}</td>
             <td class="px-6 py-4">{{ log.message }}</td>
-            <td class="px-6 py-4 text-right">
-              <a
-                class="font-medium text-primary hover:underline cursor-pointer"
-                @click="$emit('view-log', log.id)"
-                >로그 보기</a
-              >
-            </td>
           </tr>
         </tbody>
       </table>
