@@ -1,5 +1,5 @@
 <template>
-  <ChartCard title="PMS 이상 탐지 (점수) 또는 센서 신호값">
+  <ChartCard title="RMS 이상 탐지 (점수) 또는 센서 신호값">
     <template #content>
       <div class="flex items-baseline gap-3">
         <p class="text-black dark:text-white text-4xl font-bold">1800</p>
