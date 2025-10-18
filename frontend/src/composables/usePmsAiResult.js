@@ -44,57 +44,46 @@ export function usePmsAiResult() {
       // 더미 데이터 반환
       return Array.from({ length: minutes }, (_, i) => ({
         label: `${i}분`,
-        value: Math.random() > 0.7 ? 1 : 0,
+        value: 0, // 데이터 없으면 모두 정상(0)
       }))
     }
 
     // 현재 시간 기준으로 최근 N분 계산
     const now = new Date()
-    const currentMinute = now.getMinutes()
-    const currentHour = now.getHours()
-
-    // 최근 N분의 시간 목록 생성
-    const recentMinutes = []
-    for (let i = minutes - 1; i >= 0; i--) {
-      const totalMinutes = currentHour * 60 + currentMinute - i
-      const hour = Math.floor(totalMinutes / 60) % 24
-      const minute = totalMinutes % 60
-      recentMinutes.push({ hour, minute })
-    }
-
-    // 분별로 그룹화
     const minuteMap = new Map()
 
-    // 모든 분을 0으로 초기화
-    recentMinutes.forEach(({ hour, minute }) => {
-      const minuteKey = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`
+    // 최근 N분의 시간 범위 생성
+    for (let i = minutes - 1; i >= 0; i--) {
+      const targetTime = new Date(now.getTime() - i * 60 * 1000)
+      const minuteKey = targetTime.toISOString().slice(0, 16) // YYYY-MM-DDTHH:mm
       minuteMap.set(minuteKey, [])
-    })
+    }
 
-    // 실제 데이터 매핑
+    // 실제 데이터 매핑 (날짜 + 시간 기준)
     aiResults.value.forEach((item) => {
-      const date = new Date(item.createdAt)
-      const hour = date.getHours()
-      const minute = date.getMinutes()
-      const minuteKey = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`
+      const itemDate = new Date(item.createdAt)
+      const itemKey = itemDate.toISOString().slice(0, 16) // YYYY-MM-DDTHH:mm
 
-      if (minuteMap.has(minuteKey)) {
-        minuteMap.get(minuteKey).push(item.result)
+      if (minuteMap.has(itemKey)) {
+        minuteMap.get(itemKey).push(item.result)
       }
     })
 
     // 결과 생성
     const minuteData = []
-    for (const { hour, minute } of recentMinutes) {
-      const minuteKey = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`
-      const results = minuteMap.get(minuteKey) || []
+    const sortedKeys = Array.from(minuteMap.keys()).sort()
+
+    sortedKeys.forEach((key, index) => {
+      const results = minuteMap.get(key) || []
       const hasAbnormal = results.some((r) => r === 1)
+      const time = new Date(key)
+      const minute = time.getMinutes()
 
       minuteData.push({
         label: `${String(minute).padStart(2, '0')}분`,
         value: hasAbnormal ? 1 : 0,
       })
-    }
+    })
 
     return minuteData
   }
