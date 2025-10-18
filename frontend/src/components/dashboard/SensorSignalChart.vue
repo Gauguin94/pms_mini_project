@@ -1,6 +1,10 @@
 <template>
   <ChartCard title="RMS 이상 탐지 (점수) 또는 센서 신호값">
     <template #content>
+      <div class="flex items-baseline gap-3">
+        <p class="text-black dark:text-white text-4xl font-bold">1800</p>
+        <p class="text-red-500 text-base font-medium">+5%</p>
+      </div>
       <p class="text-black/60 dark:text-white/60 text-sm font-normal">지난 24시간</p>
       <div class="flex flex-1 gap-4 py-4 h-48">
         <div
