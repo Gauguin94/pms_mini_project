@@ -10,8 +10,7 @@ export function useBearingStatus(aiResults) {
    * B001 베어링 상태 (실제 API 데이터 기반)
    */
   const b001Status = computed(() => {
-    const latestResult =
-      aiResults.value.length > 0 ? aiResults.value[aiResults.value.length - 1].result : 0
+    const latestResult = aiResults.value.length > 0 ? aiResults.value[0].result : 0
 
     return latestResult === 1
       ? {
