@@ -129,17 +129,12 @@ const {
 // 베어링 상태 관리
 const { bearings } = useBearingStatus(aiResults)
 
-console.log(barings.value)
-
 // 컴포넌트 마운트 시 데이터 로드 및 자동 갱신 시작
 onMounted(async () => {
   await fetchAiResults(500) // 초기 데이터 로드
   startAutoRefresh() // 1분마다 자동 갱신 시작
 })
 
-// 컴포넌트 언마운트 시 자동 갱신 중지 (자동으로 처리됨)
-
-// 분 단위 데이터 가져오기 (60분)
 const minuteData = computed(() => getMinuteData(60))
 
 // Time Labels (분 단위 - 5분 간격으로 표시)
@@ -166,13 +161,13 @@ const summaryCards = computed(() => {
 // Retrain Logs Data
 const retrainLogs = [
   {
-    id: 'run-20230521-1',
-    startTime: '2023-05-21 10:00:00',
-    endTime: '2023-05-21 10:15:23',
+    id: 1,
+    startTime: '2025-10-15 04:40:33',
+    endTime: '2025-10-15 04:40:34',
     status: 'Success',
     statusClass:
       'inline-flex items-center rounded-md bg-green-500/10 px-2 py-1 text-xs font-medium text-green-700 dark:bg-green-500/20 dark:text-green-300',
-    duration: '15m 23s',
+    duration: '1s',
     message: '재학습이 성공적으로 완료되었습니다.',
   },
   {
@@ -183,16 +178,6 @@ const retrainLogs = [
     statusClass:
       'inline-flex items-center rounded-md bg-green-500/10 px-2 py-1 text-xs font-medium text-green-700 dark:bg-green-500/20 dark:text-green-300',
     duration: '2s',
-    message: '재학습이 성공적으로 완료되었습니다.',
-  },
-  {
-    id: 1,
-    startTime: '2025-10-15 04:40:33',
-    endTime: '2025-10-15 04:40:34',
-    status: 'Success',
-    statusClass:
-      'inline-flex items-center rounded-md bg-green-500/10 px-2 py-1 text-xs font-medium text-green-700 dark:bg-green-500/20 dark:text-green-300',
-    duration: '1s',
     message: '재학습이 성공적으로 완료되었습니다.',
   },
 ]
