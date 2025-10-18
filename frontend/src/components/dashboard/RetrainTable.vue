@@ -1,6 +1,6 @@
 <template>
   <div class="flex flex-col gap-4">
-    <h2 class="text-black dark:text-white text-2xl font-bold">재학습 이력</h2>
+    <h2 class="text-black dark:text-white text-2xl font-bold">Retrain Runs</h2>
     <div class="overflow-x-auto rounded-lg border border-primary/20 dark:border-primary/30">
       <table class="w-full text-left text-sm text-black/80 dark:text-white/80">
         <thead
