@@ -54,7 +54,7 @@
           </div>
 
           <h2 class="text-black dark:text-white text-2xl font-bold px-4 pb-3 pt-8">예지보전 상태</h2>
-          <div class="px-4 pt-6">
+          <div class="px-4 pt-6 pb-4">
             <ThreeDMotor />
           </div>
           <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 px-4 pb-6">

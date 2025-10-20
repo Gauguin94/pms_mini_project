@@ -15,10 +15,9 @@
         <div ref="threeContainer" class="three-canvas"></div>
         <div class="hud">마우스: 드래그=회전, 휠=줌, 우클릭=패닝</div>
       </div>
-      <aside v-if="activeComponent" class="detail-panel" :class="{ hidden: !isDetailOpen }">
+      <aside v-if="isDetailOpen && activeComponent" class="detail-panel">
         <div class="detail-header">
           <h2>{{ activeComponent.name }}</h2>
-          <button type="button" class="detail-close" @click="closeDetailPanel">닫기</button>
         </div>
         <div class="detail-body">
           <div class="status-pill" :class="detailStatusClass">
@@ -69,13 +68,16 @@
                 class="subsystem-row"
                 :class="{
                   'subsystem-row--active': activeComponent && component.id === activeComponent.id,
-                  'subsystem-row--clickable': true
+                  'subsystem-row--clickable': true,
                 }"
                 @click="openDetailPanel(component)"
               >
                 <div class="subsystem-label">
                   <strong>{{ component.name }}</strong>
-                  <span>스코어 {{ component.score.toFixed(2) }} · {{ component.status === 1 ? '이상' : '정상' }}</span>
+                  <span
+                    >스코어 {{ component.score.toFixed(2) }} ·
+                    {{ component.status === 1 ? '이상' : '정상' }}</span
+                  >
                 </div>
                 <div class="status-pill" :class="component.status === 1 ? 'status-1' : 'status-0'">
                   {{ component.status === 1 ? '이상' : '정상' }}
@@ -90,7 +92,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 
@@ -102,8 +104,12 @@ const isDetailOpen = ref(false)
 const componentSummary = computed(() => motorMeta.components ?? [])
 const activeComponent = computed(() => selectedComponent.value ?? componentSummary.value[0] ?? null)
 const detailEvents = computed(() => selectedComponent.value?.events ?? motorMeta.events ?? [])
-const detailStatusText = computed(() => (activeComponent.value?.status === 1 ? '이상 감지' : '정상'))
-const detailStatusClass = computed(() => (activeComponent.value?.status === 1 ? 'status-1' : 'status-0'))
+const detailStatusText = computed(() =>
+  activeComponent.value?.status === 1 ? '이상 감지' : '정상',
+)
+const detailStatusClass = computed(() =>
+  activeComponent.value?.status === 1 ? 'status-1' : 'status-0',
+)
 const detailScore = computed(() => (activeComponent.value?.score ?? 0).toFixed(2))
 const detailTrend = computed(() => activeComponent.value?.trend ?? motorMeta.trend ?? '')
 const detailTemperature = computed(() => {
@@ -128,14 +134,62 @@ const raycaster = new THREE.Raycaster()
 const pointer = new THREE.Vector2()
 let pointerMoveHandler = null
 let canvasClickHandler = null
+let resizeObserver = null
+let pendingFitFrame = null
+let pendingFitTimeout = null
 const getDevicePixelRatio = () => Math.min(window.devicePixelRatio ?? 1, 2.5)
+
+const getRendererViewSize = () => {
+  const container = threeContainer.value
+  if (!container) {
+    return { width: 0, height: 0 }
+  }
+  const rect = container.getBoundingClientRect()
+  return {
+    width: Math.max(rect.width, 1),
+    height: Math.max(rect.height, 1),
+  }
+}
 
 const updateRendererDimensions = () => {
   if (!renderer || !threeContainer.value) return
-  const width = threeContainer.value.clientWidth
-  const height = threeContainer.value.clientHeight
+  const { width, height } = getRendererViewSize()
   renderer.setPixelRatio(getDevicePixelRatio())
   renderer.setSize(width, height, false)
+  renderer.domElement.style.width = `${width}px`
+  renderer.domElement.style.height = `${height}px`
+}
+
+const performFit = () => {
+  if (!renderer || !threeContainer.value) return
+  updateRendererDimensions()
+  fitCameraToMotor()
+}
+
+const scheduleFit = () => {
+  nextTick(() => {
+    if (!renderer || !threeContainer.value) return
+    if (typeof window === 'undefined' || !window.requestAnimationFrame) {
+      performFit()
+      return
+    }
+
+    if (pendingFitFrame !== null) {
+      window.cancelAnimationFrame(pendingFitFrame)
+    }
+    pendingFitFrame = window.requestAnimationFrame(() => {
+      pendingFitFrame = null
+      performFit()
+    })
+
+    if (pendingFitTimeout !== null) {
+      window.clearTimeout(pendingFitTimeout)
+    }
+    pendingFitTimeout = window.setTimeout(() => {
+      pendingFitTimeout = null
+      performFit()
+    }, 220)
+  })
 }
 
 const openDetailPanel = (component) => {
@@ -143,16 +197,18 @@ const openDetailPanel = (component) => {
   selectedComponent.value = component
   isDetailOpen.value = true
   highlightComponent(component.id)
+  scheduleFit()
 }
 
 const closeDetailPanel = () => {
   isDetailOpen.value = false
   highlightComponent(null)
+  scheduleFit()
 }
 
 const resetCamera = () => {
   if (!motorGroup || !camera || !controls) return
-  fitCameraToMotor()
+  performFit()
 }
 
 const initThree = () => {
@@ -166,8 +222,6 @@ const initThree = () => {
   renderer = new THREE.WebGLRenderer({ antialias: true })
   if ('outputColorSpace' in renderer && THREE?.SRGBColorSpace) {
     renderer.outputColorSpace = THREE.SRGBColorSpace
-  } else if ('outputEncoding' in renderer) {
-    renderer.outputEncoding = THREE.sRGBEncoding
   }
   if (THREE?.ACESFilmicToneMapping !== undefined) {
     renderer.toneMapping = THREE.ACESFilmicToneMapping
@@ -178,12 +232,26 @@ const initThree = () => {
   container.innerHTML = ''
   container.appendChild(renderer.domElement)
 
-  camera = new THREE.PerspectiveCamera(
-    50,
-    container.clientWidth / container.clientHeight,
-    0.1,
-    100
-  )
+  if (typeof ResizeObserver !== 'undefined') {
+    resizeObserver?.disconnect()
+    resizeObserver = new ResizeObserver(() => {
+      scheduleFit()
+    })
+    resizeObserver.observe(container)
+    const stageEl = container.closest('.motor-viewer-stage')
+    if (stageEl && stageEl !== container) {
+      resizeObserver.observe(stageEl)
+    }
+    const viewerEl = container.closest('.motor-viewer')
+    if (viewerEl && viewerEl !== container && viewerEl !== stageEl) {
+      resizeObserver.observe(viewerEl)
+    }
+  }
+
+  const initialSize = getRendererViewSize()
+  const aspect =
+    initialSize.width > 0 && initialSize.height > 0 ? initialSize.width / initialSize.height : 1
+  camera = new THREE.PerspectiveCamera(50, aspect || 1, 0.1, 100)
   camera.position.set(3, 2.2, 3.4)
 
   controls = new OrbitControls(camera, renderer.domElement)
@@ -216,7 +284,7 @@ const initThree = () => {
 
   const ground = new THREE.Mesh(
     new THREE.CircleGeometry(4.5, 64),
-    new THREE.MeshStandardMaterial({ color: 0x101622, roughness: 1, metalness: 0 })
+    new THREE.MeshStandardMaterial({ color: 0x101622, roughness: 1, metalness: 0 }),
   )
   ground.rotation.x = -Math.PI / 2
   ground.position.y = -0.75
@@ -230,7 +298,7 @@ const initThree = () => {
     openDetailPanel(defaultComponent)
   }
 
-  fitCameraToMotor()
+  scheduleFit()
   animate()
 
   window.addEventListener('resize', onResize)
@@ -252,12 +320,7 @@ const animate = () => {
 
 const onResize = () => {
   if (!renderer || !camera || !threeContainer.value) return
-  updateRendererDimensions()
-  const w = threeContainer.value.clientWidth
-  const h = threeContainer.value.clientHeight
-  camera.aspect = w / Math.max(h, 1)
-  camera.updateProjectionMatrix()
-  fitCameraToMotor()
+  scheduleFit()
 }
 
 const onPointerMove = (event) => {
@@ -296,7 +359,9 @@ const highlightComponent = (componentId) => {
   motorParts.forEach((part) => {
     if (!part.mesh?.material || !('emissive' in part.mesh.material)) return
     const isSelected = componentId && part.component?.id === componentId
-    const emissive = isSelected ? new THREE.Color(0.1, 0.2, 0.35) : getDefaultEmissive(part.component)
+    const emissive = isSelected
+      ? new THREE.Color(0.1, 0.2, 0.35)
+      : getDefaultEmissive(part.component)
     part.mesh.material.emissive.copy(emissive)
     part.mesh.material.needsUpdate = true
   })
@@ -310,8 +375,9 @@ const fitCameraToMotor = () => {
   const sphere = new THREE.Sphere()
   box.getBoundingSphere(sphere)
 
-  const container = threeContainer.value
-  const aspect = container.clientWidth / Math.max(container.clientHeight, 1)
+  const { width: viewWidth, height: viewHeight } = getRendererViewSize()
+  if (!viewWidth || !viewHeight) return
+  const aspect = viewWidth / Math.max(viewHeight, 1)
   const verticalFov = THREE.MathUtils.degToRad(camera.fov)
   const horizontalFov = 2 * Math.atan(Math.tan(verticalFov / 2) * aspect)
 
@@ -322,11 +388,17 @@ const fitCameraToMotor = () => {
   const distance = Math.max(distanceForVertical, distanceForHorizontal)
   const offset = distance * 0.85
 
-  const horizontalTargetOffset = sphere.radius * 0.38
+  const viewerEl = threeContainer.value?.closest('.motor-viewer')
+  const totalWidth = viewerEl?.getBoundingClientRect().width ?? viewWidth
+  const stageRatio = totalWidth > 0 ? Math.min(Math.max(viewWidth / totalWidth, 0), 1) : 1
+  const detailRatio = 1 - stageRatio
+  const horizontalTargetOffset = sphere.radius * (0.18 - detailRatio * 0.9)
   const target = new THREE.Vector3(center.x + horizontalTargetOffset, center.y, center.z)
   const viewDirection = new THREE.Vector3(0.65, 0.32, 1).normalize()
   const cameraPosition = viewDirection.clone().multiplyScalar(offset).add(target)
 
+  camera.aspect = aspect
+  camera.updateProjectionMatrix()
   camera.position.copy(cameraPosition)
   camera.lookAt(target)
   controls.target.copy(target)
@@ -341,6 +413,13 @@ const disposeThree = () => {
   if (renderer?.domElement) {
     renderer.domElement.removeEventListener('pointermove', pointerMoveHandler)
     renderer.domElement.removeEventListener('click', canvasClickHandler)
+  }
+  resizeObserver?.disconnect()
+  if (pendingFitFrame !== null && typeof window !== 'undefined') {
+    window.cancelAnimationFrame(pendingFitFrame)
+  }
+  if (pendingFitTimeout !== null && typeof window !== 'undefined') {
+    window.clearTimeout(pendingFitTimeout)
   }
   controls?.dispose()
   motorGroup?.traverse((child) => {
@@ -363,6 +442,9 @@ const disposeThree = () => {
   animationId = null
   pointerMoveHandler = null
   canvasClickHandler = null
+  resizeObserver = null
+  pendingFitFrame = null
+  pendingFitTimeout = null
 }
 
 function createMotorMeta() {
@@ -460,9 +542,12 @@ function createMotorGeometry(components = []) {
 
   const housingMaterial = makeMaterial(housingComp?.baseColor ?? '#1a7fad', 0.55, 0.35)
   const housingShell = addPart(
-    new THREE.Mesh(new THREE.CylinderGeometry(0.88, 0.88, 1.65, 64, 1, false), housingMaterial.clone()),
+    new THREE.Mesh(
+      new THREE.CylinderGeometry(0.88, 0.88, 1.65, 64, 1, false),
+      housingMaterial.clone(),
+    ),
     housingComp,
-    true
+    true,
   )
   housingShell.rotation.z = Math.PI / 2
 
@@ -478,7 +563,7 @@ function createMotorGeometry(components = []) {
     if (radialY < -0.4) continue
     const fin = addPart(
       new THREE.Mesh(new THREE.BoxGeometry(finLength, finHeight, finDepth), finMaterial.clone()),
-      housingComp
+      housingComp,
     )
     fin.rotation.x = angle
     fin.position.set(0, radialY * finRadius, Math.sin(angle) * finRadius)
@@ -487,21 +572,27 @@ function createMotorGeometry(components = []) {
   const frontPlateMat = makeMaterial('#a3c5d4', 0.65, 0.25)
   const frontPlate = addPart(
     new THREE.Mesh(new THREE.CylinderGeometry(1.02, 1.08, 0.24, 48), frontPlateMat),
-    housingComp
+    housingComp,
   )
   frontPlate.rotation.z = Math.PI / 2
   frontPlate.position.x = 0.95
 
   const frontLip = addPart(
-    new THREE.Mesh(new THREE.CylinderGeometry(1.08, 1.14, 0.08, 48), makeMaterial('#7ca3b7', 0.5, 0.35)),
-    housingComp
+    new THREE.Mesh(
+      new THREE.CylinderGeometry(1.08, 1.14, 0.08, 48),
+      makeMaterial('#7ca3b7', 0.5, 0.35),
+    ),
+    housingComp,
   )
   frontLip.rotation.z = Math.PI / 2
   frontLip.position.x = 1.04
 
   const frontHub = addPart(
-    new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.6, 0.2, 32), makeMaterial('#d2e3ea', 0.72, 0.2)),
-    housingComp
+    new THREE.Mesh(
+      new THREE.CylinderGeometry(0.45, 0.6, 0.2, 32),
+      makeMaterial('#d2e3ea', 0.72, 0.2),
+    ),
+    housingComp,
   )
   frontHub.rotation.z = Math.PI / 2
   frontHub.position.x = 1.12
@@ -513,7 +604,7 @@ function createMotorGeometry(components = []) {
     const theta = (i / boltPositions) * Math.PI * 2
     const bolt = addPart(
       new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.28, 16), boltMaterial.clone()),
-      housingComp
+      housingComp,
     )
     bolt.rotation.x = Math.PI / 2
     bolt.rotation.z = Math.PI / 2
@@ -523,10 +614,10 @@ function createMotorGeometry(components = []) {
   const rearCover = addPart(
     new THREE.Mesh(
       new THREE.CylinderGeometry(0.84, 0.88, 0.32, 48),
-      makeMaterial(fanComp?.baseColor ?? '#2a3545', 0.45, 0.55)
+      makeMaterial(fanComp?.baseColor ?? '#2a3545', 0.45, 0.55),
     ),
     fanComp,
-    true
+    true,
   )
   rearCover.rotation.z = Math.PI / 2
   rearCover.position.x = -0.88
@@ -541,7 +632,7 @@ function createMotorGeometry(components = []) {
     const angle = (i / grillBars) * Math.PI
     const bar = addPart(
       new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.03, 0.04), makeMaterial('#5b6574', 0.35, 0.6)),
-      fanComp
+      fanComp,
     )
     bar.rotation.x = Math.PI / 2
     bar.rotation.z = angle
@@ -550,7 +641,7 @@ function createMotorGeometry(components = []) {
 
   const basePlate = addPart(
     new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.16, 1.2), makeMaterial('#102835', 0.35, 0.75)),
-    housingComp
+    housingComp,
   )
   basePlate.position.y = -1.0
 
@@ -558,7 +649,7 @@ function createMotorGeometry(components = []) {
   ;[0.72, -0.72].forEach((offset) => {
     const riser = addPart(
       new THREE.Mesh(baseRiserGeom.clone(), makeMaterial('#153848', 0.3, 0.7)),
-      housingComp
+      housingComp,
     )
     riser.position.set(offset, -0.92, 0)
   })
@@ -567,7 +658,7 @@ function createMotorGeometry(components = []) {
   ;[0.72, -0.72].forEach((offset) => {
     const pad = addPart(
       new THREE.Mesh(footPadGeom.clone(), makeMaterial('#0c1d26', 0.25, 0.8)),
-      housingComp
+      housingComp,
     )
     pad.position.set(offset, -1.12, 0)
   })
@@ -576,29 +667,35 @@ function createMotorGeometry(components = []) {
     const terminalBody = addPart(
       new THREE.Mesh(
         new THREE.BoxGeometry(0.75, 0.45, 0.62),
-        makeMaterial(terminalComp.baseColor ?? '#1b748c', 0.5, 0.4)
+        makeMaterial(terminalComp.baseColor ?? '#1b748c', 0.5, 0.4),
       ),
       terminalComp,
-      true
+      true,
     )
     terminalBody.position.set(-0.18, 0.84, 0)
 
     const terminalCap = addPart(
       new THREE.Mesh(new THREE.BoxGeometry(0.82, 0.08, 0.68), makeMaterial('#215f73', 0.4, 0.55)),
-      terminalComp
+      terminalComp,
     )
     terminalCap.position.set(-0.18, 1.07, 0)
 
     const handle = addPart(
-      new THREE.Mesh(new THREE.TorusGeometry(0.28, 0.05, 12, 36), makeMaterial('#c62828', 0.2, 0.35)),
-      terminalComp
+      new THREE.Mesh(
+        new THREE.TorusGeometry(0.28, 0.05, 12, 36),
+        makeMaterial('#c62828', 0.2, 0.35),
+      ),
+      terminalComp,
     )
     handle.rotation.x = Math.PI / 2.4
     handle.position.set(-0.18, 1.17, 0)
 
     const cablePort = addPart(
-      new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 0.36, 24), makeMaterial('#0c1d26', 0.3, 0.65)),
-      terminalComp
+      new THREE.Mesh(
+        new THREE.CylinderGeometry(0.09, 0.09, 0.36, 24),
+        makeMaterial('#0c1d26', 0.3, 0.65),
+      ),
+      terminalComp,
     )
     cablePort.rotation.z = Math.PI / 2
     cablePort.position.set(-0.6, 0.78, 0)
@@ -608,10 +705,10 @@ function createMotorGeometry(components = []) {
     const stator = addPart(
       new THREE.Mesh(
         new THREE.CylinderGeometry(0.58, 0.58, 1.45, 48),
-        makeMaterial(statorComp.baseColor ?? '#2d4f9e', 0.35, 0.55)
+        makeMaterial(statorComp.baseColor ?? '#2d4f9e', 0.35, 0.55),
       ),
       statorComp,
-      true
+      true,
     )
     stator.rotation.z = Math.PI / 2
     stator.position.x = -0.02
@@ -621,30 +718,39 @@ function createMotorGeometry(components = []) {
     const rotor = addPart(
       new THREE.Mesh(
         new THREE.CylinderGeometry(0.34, 0.34, 1.55, 48),
-        makeMaterial(rotorComp.baseColor ?? '#cbd6dd', 0.55, 0.35)
+        makeMaterial(rotorComp.baseColor ?? '#cbd6dd', 0.55, 0.35),
       ),
       rotorComp,
-      true
+      true,
     )
     rotor.rotation.z = Math.PI / 2
     rotor.position.x = 0.0
 
     const shaft = addPart(
-      new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.13, 3.6, 32), makeMaterial('#b5b8bd', 0.62, 0.28)),
-      rotorComp
+      new THREE.Mesh(
+        new THREE.CylinderGeometry(0.13, 0.13, 3.6, 32),
+        makeMaterial('#b5b8bd', 0.62, 0.28),
+      ),
+      rotorComp,
     )
     shaft.rotation.z = Math.PI / 2
 
     const shaftShoulder = addPart(
-      new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.28, 32), makeMaterial('#d9dcdf', 0.6, 0.25)),
-      rotorComp
+      new THREE.Mesh(
+        new THREE.CylinderGeometry(0.22, 0.22, 0.28, 32),
+        makeMaterial('#d9dcdf', 0.6, 0.25),
+      ),
+      rotorComp,
     )
     shaftShoulder.rotation.z = Math.PI / 2
     shaftShoulder.position.x = 1.3
 
     const shaftTip = addPart(
-      new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.46, 32), makeMaterial('#e7e9eb', 0.58, 0.18)),
-      rotorComp
+      new THREE.Mesh(
+        new THREE.CylinderGeometry(0.18, 0.18, 0.46, 32),
+        makeMaterial('#e7e9eb', 0.58, 0.18),
+      ),
+      rotorComp,
     )
     shaftTip.rotation.z = Math.PI / 2
     shaftTip.position.x = 1.56
@@ -686,6 +792,7 @@ onUnmounted(() => {
 <style scoped>
 .motor-viewer {
   position: relative;
+  display: flex;
   height: 540px;
   border-radius: 18px;
   overflow: hidden;
@@ -695,8 +802,9 @@ onUnmounted(() => {
 
 .motor-viewer-stage {
   position: relative;
+  flex: 1 1 auto;
   height: 100%;
-  width: 100%;
+  min-width: 0;
 }
 
 .three-canvas {
@@ -705,8 +813,8 @@ onUnmounted(() => {
 }
 
 .three-canvas :deep(canvas) {
-  width: 100% !important;
-  height: 100% !important;
+  width: 100%;
+  height: 100%;
   display: block;
 }
 
@@ -724,26 +832,16 @@ onUnmounted(() => {
 }
 
 .detail-panel {
-  position: absolute;
-  top: 0;
-  right: 0;
-  width: 320px;
+  flex: 0 0 320px;
   height: 100%;
   background: rgba(12, 16, 24, 0.94);
   backdrop-filter: blur(12px);
   box-shadow: -16px 0 32px rgba(0, 0, 0, 0.3);
+  border-left: 1px solid rgba(255, 255, 255, 0.05);
   padding: 22px 24px;
   display: flex;
   flex-direction: column;
   gap: 18px;
-  transform: translateX(0);
-  transition: transform 0.25s ease, opacity 0.25s ease;
-}
-
-.detail-panel.hidden {
-  transform: translateX(20px);
-  opacity: 0;
-  pointer-events: none;
 }
 
 .detail-header {
@@ -844,7 +942,9 @@ onUnmounted(() => {
   padding: 10px 12px;
   border-radius: 10px;
   background: rgba(255, 255, 255, 0.02);
-  transition: background 0.2s ease, border 0.2s ease;
+  transition:
+    background 0.2s ease,
+    border 0.2s ease;
 }
 
 .subsystem-row--clickable {
