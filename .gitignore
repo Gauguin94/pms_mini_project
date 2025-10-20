@@ -1,4 +1,7 @@
 .env
+
+myenv/
+
 node_modules/
 chroma_store/
 docker/
@@ -40,3 +43,4 @@ build/
 
 # Java build
 **/target/
+
