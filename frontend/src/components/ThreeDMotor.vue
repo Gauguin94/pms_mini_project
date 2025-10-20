@@ -128,6 +128,15 @@ const raycaster = new THREE.Raycaster()
 const pointer = new THREE.Vector2()
 let pointerMoveHandler = null
 let canvasClickHandler = null
+const getDevicePixelRatio = () => Math.min(window.devicePixelRatio ?? 1, 2.5)
+
+const updateRendererDimensions = () => {
+  if (!renderer || !threeContainer.value) return
+  const width = threeContainer.value.clientWidth
+  const height = threeContainer.value.clientHeight
+  renderer.setPixelRatio(getDevicePixelRatio())
+  renderer.setSize(width, height, false)
+}
 
 const openDetailPanel = (component) => {
   if (!component) return
@@ -153,9 +162,18 @@ const initThree = () => {
   scene = new THREE.Scene()
   scene.background = new THREE.Color('#0b0f18')
 
+  // renderer 먼저 생성
   renderer = new THREE.WebGLRenderer({ antialias: true })
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
-  renderer.setSize(container.clientWidth, container.clientHeight)
+  if ('outputColorSpace' in renderer && THREE?.SRGBColorSpace) {
+    renderer.outputColorSpace = THREE.SRGBColorSpace
+  } else if ('outputEncoding' in renderer) {
+    renderer.outputEncoding = THREE.sRGBEncoding
+  }
+  if (THREE?.ACESFilmicToneMapping !== undefined) {
+    renderer.toneMapping = THREE.ACESFilmicToneMapping
+  }
+  renderer.toneMappingExposure = 1.1
+  updateRendererDimensions()
   renderer.domElement.style.cursor = 'grab'
   container.innerHTML = ''
   container.appendChild(renderer.domElement)
@@ -181,13 +199,20 @@ const initThree = () => {
   rimLight.position.set(-4, 3, -6)
   scene.add(ambient, keyLight, rimLight)
 
+  // motorGroup 생성 (한 번만!)
   motorGroup = new THREE.Group()
-  motorGroup.position.y = 0.4
   scene.add(motorGroup)
 
   motorParts = createMotorGeometry(motorMeta.components)
   motorParts.forEach((part) => motorGroup.add(part.mesh))
   updatePartColors(motorParts)
+
+  // 중앙 정렬
+  const box = new THREE.Box3().setFromObject(motorGroup)
+  const center = box.getCenter(new THREE.Vector3())
+  motorGroup.position.x = -center.x
+  motorGroup.position.y = -center.y + 0.4
+  motorGroup.position.z = -center.z
 
   const ground = new THREE.Mesh(
     new THREE.CircleGeometry(4.5, 64),
@@ -227,11 +252,11 @@ const animate = () => {
 
 const onResize = () => {
   if (!renderer || !camera || !threeContainer.value) return
+  updateRendererDimensions()
   const w = threeContainer.value.clientWidth
   const h = threeContainer.value.clientHeight
   camera.aspect = w / Math.max(h, 1)
   camera.updateProjectionMatrix()
-  renderer.setSize(w, h)
   fitCameraToMotor()
 }
 

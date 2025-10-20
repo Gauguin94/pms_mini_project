@@ -54,7 +54,10 @@
           </div>
 
           <h2 class="text-black dark:text-white text-2xl font-bold px-4 pb-3 pt-8">예지보전 상태</h2>
-          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 p-4">
+          <div class="px-4 pt-6">
+            <ThreeDMotor />
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 px-4 pb-6">
             <BearingStatusCard
               v-for="bearing in bearings"
               :key="bearing.id"
@@ -92,6 +95,7 @@ import BearingStatusCard from '@/components/dashboard/BearingStatusCard.vue'
 import RetrainTable from '@/components/dashboard/RetrainTable.vue'
 import LogViewer from '@/components/dashboard/LogViewer.vue'
 import RefreshIndicator from '@/components/dashboard/RefreshIndicator.vue'
+import ThreeDMotor from '@/components/ThreeDMotor.vue'
 
 import { usePmsAiResult } from '@/composables/usePmsAiResult'
 import { useBearingStatus } from '@/composables/useBearingStatus'
