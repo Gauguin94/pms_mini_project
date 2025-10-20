@@ -99,7 +99,6 @@ import { retrainLogApi } from '@/services/api'
 
 const {
   aiResults,
-  loading,
   error,
   fetchAiResults,
   getMinuteData,
