@@ -12,6 +12,7 @@ import os
 import sys
 import time
 from contextlib import contextmanager
+from datetime import datetime, timezone, timedelta
 from decimal import Decimal
 from functools import lru_cache
 from pathlib import Path
@@ -37,6 +38,8 @@ NEW_MODEL_DIR = ROOT_DIR / "new_model"
 DEFAULT_MODEL_PATH = AUTO_ENCODER_DIR / "normal_train.model"
 DEFAULT_SCALER_PATH = AUTO_ENCODER_DIR / "scaler.joblib"
 
+KST = timezone(timedelta(hours=9))
+
 if not PMS_MASTER_DIR.exists():
     raise FileNotFoundError(f"PMS-master 디렉터리를 찾을 수 없습니다: {PMS_MASTER_DIR}")
 
@@ -58,7 +61,7 @@ LATENT_DIM = 8
 BATCH_SIZE = 8
 NUM_EPOCHS = 100
 LEARNING_RATE = 5e-3
-ANOMALY_THRESHOLD = 50.0  # MAE 기준
+ANOMALY_THRESHOLD = 145.0  # MAE 기준
 SLEEP_SECONDS = 60
 DROP_TAIL_COLUMNS = 9
 
@@ -178,6 +181,13 @@ def debug_db_snapshot():
             cur.execute("SELECT * FROM newtrain_table LIMIT 3;")
             rows = cur.fetchall()
             print("[DB] newtrain_table SAMPLE(3) keys:", list(rows[0].keys()) if rows else [])
+            for r in rows:
+                # 앞 5개 컬럼만 프린트
+                items = list(r.items())[:5]
+                print("   ", items)
+            cur.execute("SELECT * FROM realtime_table LIMIT 3;")
+            rows = cur.fetchall()
+            print("[DB] realtime_table SAMPLE(3) keys:", list(rows[0].keys()) if rows else [])
             for r in rows:
                 # 앞 5개 컬럼만 프린트
                 items = list(r.items())[:5]
@@ -306,11 +316,12 @@ def insert_ai_result(result_flag: int) -> None:
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """
-    query = "INSERT INTO pms_ai_result (result) VALUES (%s);"
+    insert_query = "INSERT INTO pms_ai_result (result, created_at) VALUES (%s, %s);"
+    created_at_kst = datetime.now(timezone.utc).astimezone(KST).replace(tzinfo=None)
     with _db_connection() as conn:
         with conn.cursor() as cursor:
             cursor.execute(create_query)
-            cursor.execute(query, (result_flag,))
+            cursor.execute(insert_query, (result_flag, created_at_kst))
         conn.commit()
 
 def load_newtrain_features() -> pd.DataFrame:

@@ -12,6 +12,27 @@ export function useRealtimeData() {
   const loading = ref(false)
   const error = ref(null)
 
+  const normalizeRealtimeRow = (row) => {
+    if (row == null) {
+      return null
+    }
+
+    if (typeof row === 'number') {
+      return { timeRms: row }
+    }
+
+    if (typeof row === 'object') {
+      const candidate = row.timeRms ?? row.time_rms
+      const numeric = Number(candidate)
+
+      if (Number.isFinite(numeric)) {
+        return { ...row, timeRms: numeric }
+      }
+    }
+
+    return null
+  }
+
   /**
    * 최신 realtime 데이터 조회
    * @param {number} limit - 조회할 데이터 개수
@@ -22,11 +43,17 @@ export function useRealtimeData() {
 
     try {
       const data = await realtimeDataApi.getLatestData(limit)
-      realtimeData.value = data
-      console.log(`✅ Realtime 데이터 ${data.length}개 로드 완료`)
+      const normalized = Array.isArray(data)
+        ? data
+            .map(normalizeRealtimeRow)
+            .filter((item) => item && Number.isFinite(item.timeRms))
+        : []
+
+      realtimeData.value = normalized
+      console.log(`Realtime data loaded: ${normalized.length}`)
     } catch (err) {
       error.value = err.message
-      console.error('❌ Realtime 데이터 로드 실패:', err)
+      console.error('Realtime data load failed:', err)
     } finally {
       loading.value = false
     }

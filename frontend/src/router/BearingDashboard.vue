@@ -1,78 +1,59 @@
 <template>
   <div
-    class="relative flex h-auto min-h-screen w-full flex-col bg-background-light dark:bg-background-dark group/design-root overflow-x-hidden"
+    class="relative flex h-auto min-h-screen w-full flex-col bg-background-light dark:bg-background-dark overflow-x-hidden"
   >
     <div class="layout-container flex h-full grow flex-col">
-      <!-- Header Component -->
       <DashboardHeader />
 
-      <!-- Main Content -->
       <main class="px-10 md:px-20 lg:px-40 flex flex-1 justify-center py-8">
         <div class="layout-content-container flex flex-col w-full max-w-6xl">
-          <!-- Title -->
           <div class="flex flex-col gap-2 p-4">
             <div class="flex items-center justify-between">
               <div>
-                <h1 class="text-black dark:text-white text-3xl font-bold">
-                  베어링 모니터링 대시보드
-                </h1>
-                <p class="text-black/60 dark:text-white/60 text-base font-normal leading-normal">
-                  베어링 상태 및 예측 분석에 대한 실시간 정보입니다.
+                <h1 class="text-black dark:text-white text-3xl font-bold">베어링 모니터링 대시보드</h1>
+                <p class="text-black/60 dark:text-white/60 text-base">
+                  베어링 상태 예측과 재학습 이력을 한눈에 확인하세요.
                 </p>
               </div>
               <RefreshIndicator
                 :is-refreshing="isRefreshing"
                 :last-updated="lastUpdated"
-                @refresh="fetchAiResults(500)"
+                @refresh="handleManualRefresh"
               />
             </div>
 
-            <!-- 에러 메시지 -->
             <div
               v-if="error"
               class="mt-4 p-4 bg-red-500/10 border border-red-500/50 rounded-lg flex items-center gap-3"
             >
               <span class="material-symbols-outlined text-red-500">error</span>
               <div class="flex-1">
-                <p class="text-red-700 dark:text-red-300 font-medium">연결 오류</p>
+                <p class="text-red-700 dark:text-red-300 font-medium">데이터 로드 오류</p>
                 <p class="text-red-600 dark:text-red-400 text-sm">{{ error }}</p>
                 <p class="text-red-600 dark:text-red-400 text-xs mt-1">
-                  백엔드 서버가 실행 중인지 확인하세요: http://localhost:8080
+                  백엔드 서버가 실행 중인지 확인해 주세요. (http://localhost:8080)
                 </p>
               </div>
               <button
                 @click="fetchAiResults(500)"
                 class="px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors"
               >
-                재시도
+                다시 시도
               </button>
             </div>
           </div>
 
-          <!-- Summary Cards -->
           <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 p-4">
-            <SummaryCard
-              v-for="card in summaryCards"
-              :key="card.label"
-              :label="card.label"
-              :value="card.value"
-            />
+            <SummaryCard v-for="card in summaryCards" :key="card.label" :label="card.label" :value="card.value" />
           </div>
 
-          <!-- Charts Section -->
-          <h2 class="text-black dark:text-white text-2xl font-bold px-4 pb-3 pt-8">
-            베어링 상태 개요
-          </h2>
+          <h2 class="text-black dark:text-white text-2xl font-bold px-4 pb-3 pt-8">베어링 상태 개요</h2>
           <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 px-4 py-6">
-            <!-- Chart 1: PMS 이상 탐지 -->
             <SensorSignalChart :time-labels="timeLabels" />
-
-            <!-- Chart 2: 베어링 상태 분포 (Binary) -->
             <BinaryStateChart :minute-data="minuteData" :time-labels="timeLabels" />
           </div>
 
-          <!-- Predictive Maintenance Section -->
-          <h2 class="text-black dark:text-white text-2xl font-bold px-4 pb-3 pt-8">예지보전</h2>
+          <h2 class="text-black dark:text-white text-2xl font-bold px-4 pb-3 pt-8">예지보전 상태</h2>
           <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 p-4">
             <BearingStatusCard
               v-for="bearing in bearings"
@@ -87,12 +68,12 @@
             />
           </div>
 
-          <!-- Retrain History Table -->
-          <div class="flex flex-col gap-8 p-4">
+          <div class="flex flex-col gap-4 p-4">
+            <div v-if="retrainLogsError" class="p-4 rounded-lg border border-red-500/50 bg-red-500/10 text-red-200">
+              재학습 로그를 불러오는 중 오류가 발생했습니다: {{ retrainLogsError }}
+            </div>
             <RetrainTable :logs="retrainLogs" @view-log="handleViewLog" />
-
-            <!-- Log Details -->
-            <LogViewer :log-id="selectedLog" :limit="20" />
+            <LogViewer :log-id="selectedLog" :limit="200" />
           </div>
         </div>
       </main>
@@ -101,7 +82,8 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
+
 import DashboardHeader from '@/components/dashboard/DashboardHeader.vue'
 import SummaryCard from '@/components/dashboard/SummaryCard.vue'
 import SensorSignalChart from '@/components/dashboard/SensorSignalChart.vue'
@@ -110,10 +92,11 @@ import BearingStatusCard from '@/components/dashboard/BearingStatusCard.vue'
 import RetrainTable from '@/components/dashboard/RetrainTable.vue'
 import LogViewer from '@/components/dashboard/LogViewer.vue'
 import RefreshIndicator from '@/components/dashboard/RefreshIndicator.vue'
+
 import { usePmsAiResult } from '@/composables/usePmsAiResult'
 import { useBearingStatus } from '@/composables/useBearingStatus'
+import { retrainLogApi } from '@/services/api'
 
-// PMS AI Result API 연결
 const {
   aiResults,
   loading,
@@ -126,73 +109,104 @@ const {
   stopAutoRefresh,
 } = usePmsAiResult()
 
-// 베어링 상태 관리
 const { bearings } = useBearingStatus(aiResults)
 
-// 컴포넌트 마운트 시 데이터 로드 및 자동 갱신 시작
-onMounted(async () => {
-  await fetchAiResults(500) // 초기 데이터 로드
-  startAutoRefresh() // 1분마다 자동 갱신 시작
-})
+const retrainLogs = ref([])
+const retrainLogsError = ref(null)
+const retrainLogsLoading = ref(false)
+const selectedLog = ref(null)
+
+const statusClassFor = (status) => {
+  switch (status) {
+    case 'success':
+      return 'inline-flex items-center rounded-md bg-green-500/10 px-2 py-1 text-xs font-medium text-green-700 dark:bg-green-500/20 dark:text-green-300'
+    case 'failed':
+      return 'inline-flex items-center rounded-md bg-red-500/10 px-2 py-1 text-xs font-medium text-red-700 dark:bg-red-500/20 dark:text-red-300'
+    default:
+      return 'inline-flex items-center rounded-md bg-yellow-500/10 px-2 py-1 text-xs font-medium text-yellow-700 dark:bg-yellow-500/20 dark:text-yellow-300'
+  }
+}
+
+const fetchRetrainLogs = async (limit = 20) => {
+  retrainLogsLoading.value = true
+  retrainLogsError.value = null
+  try {
+    const data = await retrainLogApi.getLogs(limit)
+    retrainLogs.value = data.map((row) => ({
+      id: row.id,
+      startTime: row.started_at,
+      endTime: row.ended_at,
+      status: row.status,
+      statusClass: statusClassFor(row.status),
+      duration: row.duration_sec != null ? `${row.duration_sec}s` : '-',
+      message: row.message || '',
+    }))
+  } catch (err) {
+    retrainLogsError.value = err.message
+    retrainLogs.value = []
+    console.error('재학습 로그 조회 실패:', err)
+  } finally {
+    retrainLogsLoading.value = false
+  }
+}
 
 const minuteData = computed(() => getMinuteData(60))
 
-// Time Labels (현재 시간 기준 - 5분 간격으로 표시)
 const timeLabels = computed(() => {
   const now = new Date()
   const labels = []
 
   for (let i = 0; i < 60; i += 5) {
-    const targetTime = new Date(now.getTime() - (60 - i) * 60 * 1000)
-    const hours = targetTime.getHours()
-    const minutes = targetTime.getMinutes()
-    labels.push(`${hours}:${String(minutes).padStart(2, '0')}`)
+    const target = new Date(now.getTime() - (60 - i) * 60 * 1000)
+    const hours = target.getHours().toString().padStart(2, '0')
+    const minutes = target.getMinutes().toString().padStart(2, '0')
+    labels.push(`${hours}:${minutes}`)
   }
 
   return labels
 })
 
-// Summary Cards Data
 const summaryCards = computed(() => {
-  const abnormalCount = aiResults.value.filter((r) => r.result === 1).length
+  const abnormalCount = aiResults.value.filter((item) => Number(item.result) === 1).length
   const totalCount = aiResults.value.length
 
   return [
-    { label: '총 베어링 수', value: '1' }, // 단일 베어링
+    { label: '총 베어링 수', value: '1' },
     { label: '활성 알림', value: abnormalCount.toString() },
     { label: '예측 수', value: totalCount.toString() },
   ]
 })
 
-// Retrain Logs Data
-const retrainLogs = [
-  {
-    id: 1,
-    startTime: '2025-10-15 04:40:33',
-    endTime: '2025-10-15 04:40:34',
-    status: 'Success',
-    statusClass:
-      'inline-flex items-center rounded-md bg-green-500/10 px-2 py-1 text-xs font-medium text-green-700 dark:bg-green-500/20 dark:text-green-300',
-    duration: '1s',
-    message: '재학습이 성공적으로 완료되었습니다.',
-  },
-  {
-    id: 2,
-    startTime: '2025-10-15 06:55:48',
-    endTime: '2025-10-15 06:55:50',
-    status: 'Success',
-    statusClass:
-      'inline-flex items-center rounded-md bg-green-500/10 px-2 py-1 text-xs font-medium text-green-700 dark:bg-green-500/20 dark:text-green-300',
-    duration: '2s',
-    message: '재학습이 성공적으로 완료되었습니다.',
-  },
-]
+const handleManualRefresh = async () => {
+  await fetchAiResults(500)
+  await fetchRetrainLogs(20)
+}
 
-// Selected Log (초기값 null, 사용자가 "로그 보기" 버튼 클릭 시 설정됨)
-const selectedLog = ref(null)
-
-// Handle View Log
 const handleViewLog = (logId) => {
   selectedLog.value = logId
 }
+
+onMounted(async () => {
+  await fetchAiResults(50)
+  await fetchRetrainLogs(20)
+  startAutoRefresh()
+})
+
+onBeforeUnmount(() => {
+  stopAutoRefresh()
+})
+
+watch(
+  retrainLogs,
+  (logs) => {
+    if (logs.length === 0) {
+      selectedLog.value = null
+      return
+    }
+    if (!selectedLog.value || !logs.find((log) => log.id === selectedLog.value)) {
+      selectedLog.value = logs[0].id
+    }
+  },
+  { immediate: true },
+)
 </script>

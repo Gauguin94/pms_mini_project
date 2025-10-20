@@ -15,11 +15,11 @@
       <div class="h-64 overflow-y-auto font-mono text-sm text-white">
         <div v-if="loading && logs.length === 0" class="text-gray-400">로그를 불러오는 중...</div>
         <div v-else-if="error" class="text-red-400">{{ error }}</div>
-        <div v-else-if="logs.length === 0" class="text-gray-400">로그가 없습니다.</div>
+        <div v-else-if="logs.length === 0" class="text-gray-400">표시할 로그가 없습니다.</div>
         <div v-else>
           <p
             v-for="log in logs"
-            :key="log.id"
+            :key="`${log.seq}-${log.ts}`"
             :class="{
               'text-red-400': log.level === 'ERROR',
               'text-yellow-400': log.level === 'WARN',
@@ -27,7 +27,7 @@
             }"
           >
             <span class="text-gray-500">[{{ formatTime(log.ts) }}]</span>
-            <span :class="getLevelClass(log.level)">[{{ log.level }}]</span>
+            <span :class="levelClass(log.level)">[{{ log.level }}]</span>
             {{ log.text }}
           </p>
         </div>
@@ -37,18 +37,17 @@
 </template>
 
 <script setup>
-import { ref, watch, onMounted } from 'vue'
-import { retrainLogDetailApi } from '@/services/api'
+import { ref, watch } from 'vue'
+import { retrainLogApi } from '@/services/api'
 
 const props = defineProps({
   logId: {
     type: [String, Number],
-
     default: null,
   },
   limit: {
     type: Number,
-    default: 20,
+    default: 200,
   },
 })
 
@@ -56,9 +55,6 @@ const logs = ref([])
 const loading = ref(false)
 const error = ref(null)
 
-/**
- * 로그 데이터 가져오기
- */
 const fetchLogs = async () => {
   if (!props.logId) return
 
@@ -66,38 +62,28 @@ const fetchLogs = async () => {
   error.value = null
 
   try {
-    const data = await retrainLogDetailApi.getLatestDetailsByLogId(props.logId, props.limit)
-    // 최신순으로 받아오므로 seq 순서대로 정렬
+    const data = await retrainLogApi.getLogDetails(props.logId, props.limit)
     logs.value = data.sort((a, b) => a.seq - b.seq)
-    console.log(`✅ 로그 ${data.length}개 로드 완료 (logId: ${props.logId})`)
+    console.log(`로그 ${data.length}개 로드 완료 (logId: ${props.logId})`)
   } catch (err) {
     error.value = err.message
-    console.error('❌ 로그 로드 실패:', err)
+    console.error('재학습 로그 로드 실패:', err)
   } finally {
     loading.value = false
   }
 }
 
-/**
- * 로그 새로고침
- */
 const refreshLogs = () => {
   fetchLogs()
 }
 
-/**
- * 시간 포맷팅
- */
 const formatTime = (timestamp) => {
   if (!timestamp) return ''
-  const date = new Date(timestamp)
-  return date.toLocaleTimeString('ko-KR', { hour12: false })
+  const date = new Date(timestamp.replace(' ', 'T'))
+  return date.toLocaleString('ko-KR', { hour12: false })
 }
 
-/**
- * 로그 레벨에 따른 CSS 클래스
- */
-const getLevelClass = (level) => {
+const levelClass = (level) => {
   switch (level) {
     case 'ERROR':
       return 'text-red-400 font-bold'
@@ -110,13 +96,13 @@ const getLevelClass = (level) => {
   }
 }
 
-// logId 변경 시 로그 다시 가져오기
 watch(
   () => props.logId,
   (newLogId) => {
-    console.log('🔍 logId 변경 감지:', newLogId)
     if (newLogId) {
       fetchLogs()
+    } else {
+      logs.value = []
     }
   },
   { immediate: true },

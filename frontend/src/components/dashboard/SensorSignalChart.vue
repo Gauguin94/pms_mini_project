@@ -10,10 +10,7 @@
         <div
           class="flex flex-col justify-between text-black/60 dark:text-white/60 text-xs font-bold uppercase tracking-wider"
         >
-          <p>3</p>
-          <p>1</p>
-          <p>-1</p>
-          <p>-3</p>
+          <p v-for="tick in yTickLabels" :key="tick">{{ tick }}</p>
         </div>
         <div class="flex-1 flex flex-col gap-4">
           <svg
@@ -56,11 +53,11 @@
 </template>
 
 <script setup>
-import { onMounted, computed } from 'vue'
+import { onMounted, onBeforeUnmount, computed } from 'vue'
 import ChartCard from './ChartCard.vue'
 import { useRealtimeData } from '@/composables/useRealtimeData'
 
-const { realtimeData, loading, fetchRealtimeData, getTimeRmsValues } = useRealtimeData()
+const { fetchRealtimeData, getTimeRmsValues } = useRealtimeData()
 
 defineProps({
   timeLabels: {
@@ -69,42 +66,95 @@ defineProps({
   },
 })
 
-// 데이터 가져오기 및 자동 갱신
+let refreshTimer = null
+
 onMounted(async () => {
   await fetchRealtimeData(50)
-  // 1분마다 자동 갱신
-  setInterval(() => fetchRealtimeData(50), 60000)
+  refreshTimer = setInterval(() => fetchRealtimeData(50), 60000)
 })
 
-// time_rms 값을 SVG path로 변환
-// Y축 범위: -3 ~ 3 (총 6)
-// SVG 높이: 150px
+onBeforeUnmount(() => {
+  if (refreshTimer) {
+    clearInterval(refreshTimer)
+    refreshTimer = null
+  }
+})
+
+const CHART_WIDTH = 472
+const CHART_HEIGHT = 150
+const Y_TICK_COUNT = 4
+
+const chartValues = computed(() =>
+  getTimeRmsValues().filter((value) => Number.isFinite(value))
+)
+
+const chartScale = computed(() => {
+  const values = chartValues.value
+  if (!values.length) {
+    const scale = () => CHART_HEIGHT / 2
+    return { min: -1, max: 1, scale }
+  }
+
+  let min = Math.min(...values)
+  let max = Math.max(...values)
+
+  if (min === max) {
+    min -= 1
+    max += 1
+  }
+
+  const padding = (max - min) * 0.1 || 1
+  min -= padding
+  max += padding
+
+  const range = max - min
+
+  const scale = (value) => {
+    const clamped = Math.max(min, Math.min(max, value))
+    const normalized = (max - clamped) / range
+    return normalized * CHART_HEIGHT
+  }
+
+  return { min, max, scale }
+})
+
+const yTickLabels = computed(() => {
+  const { min, max } = chartScale.value
+  const step = Y_TICK_COUNT > 1 ? (max - min) / (Y_TICK_COUNT - 1) : 0
+
+  return Array.from({ length: Y_TICK_COUNT }, (_, index) => {
+    const value = max - step * index
+    if (!Number.isFinite(value)) return value
+    return Math.round(value).toLocaleString()
+  })
+})
+
 const chartPath = computed(() => {
-  const values = getTimeRmsValues()
-  if (values.length === 0) return 'M0 75 L472 75' // 기본 중앙선
-
-  const yScale = (value) => {
-    // value가 3일 때 y=0, -3일 때 y=150
-    const normalized = (3 - value) / 6
-    return Math.max(0, Math.min(150, normalized * 150))
+  const values = chartValues.value
+  if (values.length === 0) {
+    const mid = CHART_HEIGHT / 2
+    return `M0 ${mid} L${CHART_WIDTH} ${mid}`
   }
 
-  const step = 472 / Math.max(1, values.length - 1)
-  return values.map((v, i) => `${i === 0 ? 'M' : 'L'}${i * step} ${yScale(v)}`).join(' ')
+  const { scale } = chartScale.value
+  const step = CHART_WIDTH / Math.max(1, values.length - 1)
+
+  return values.map((v, i) => `${i === 0 ? 'M' : 'L'}${i * step} ${scale(v)}`).join(' ')
 })
 
-// 채워진 영역을 위한 path (아래쪽 닫힌 path)
 const chartPathFilled = computed(() => {
-  const values = getTimeRmsValues()
-  if (values.length === 0) return 'M0 75 L472 75 L472 150 L0 150 Z'
-
-  const yScale = (value) => {
-    const normalized = (3 - value) / 6
-    return Math.max(0, Math.min(150, normalized * 150))
+  const values = chartValues.value
+  if (values.length === 0) {
+    const mid = CHART_HEIGHT / 2
+    return `M0 ${mid} L${CHART_WIDTH} ${mid} L${CHART_WIDTH} ${CHART_HEIGHT} L0 ${CHART_HEIGHT} Z`
   }
 
-  const step = 472 / Math.max(1, values.length - 1)
-  const linePath = values.map((v, i) => `${i === 0 ? 'M' : 'L'}${i * step} ${yScale(v)}`).join(' ')
-  return `${linePath}V150H0V${yScale(values[0])}Z`
+  const { scale } = chartScale.value
+  const step = CHART_WIDTH / Math.max(1, values.length - 1)
+  const linePath = values
+    .map((v, i) => `${i === 0 ? 'M' : 'L'}${i * step} ${scale(v)}`)
+    .join(' ')
+
+  return `${linePath}V${CHART_HEIGHT}H0V${scale(values[0])}Z`
 })
 </script>
