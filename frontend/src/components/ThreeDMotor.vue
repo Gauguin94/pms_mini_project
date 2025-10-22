@@ -132,11 +132,14 @@ let motorParts = []
 let animationId = null
 const raycaster = new THREE.Raycaster()
 const pointer = new THREE.Vector2()
+let clock = null
 let pointerMoveHandler = null
 let canvasClickHandler = null
 let resizeObserver = null
 let pendingFitFrame = null
 let pendingFitTimeout = null
+const SELECTED_EMISSIVE = new THREE.Color(0.1, 0.2, 0.35)
+const FAULT_HIGHLIGHT_TARGET = new THREE.Color(0.6, 0.05, 0.05)
 const getDevicePixelRatio = () => Math.min(window.devicePixelRatio ?? 1, 2.5)
 
 const getRendererViewSize = () => {
@@ -216,6 +219,7 @@ const initThree = () => {
   if (!container) return
 
   scene = new THREE.Scene()
+  clock = new THREE.Clock()
   scene.background = new THREE.Color('#0b0f18')
 
   // renderer 먼저 생성
@@ -313,6 +317,9 @@ const animate = () => {
   if (controls) {
     controls.update()
   }
+  if (clock) {
+    updateFaultPulse(clock.getElapsedTime())
+  }
   if (renderer && scene && camera) {
     renderer.render(scene, camera)
   }
@@ -357,13 +364,46 @@ const getPickableMeshes = () =>
 
 const highlightComponent = (componentId) => {
   motorParts.forEach((part) => {
-    if (!part.mesh?.material || !('emissive' in part.mesh.material)) return
-    const isSelected = componentId && part.component?.id === componentId
-    const emissive = isSelected
-      ? new THREE.Color(0.1, 0.2, 0.35)
-      : getDefaultEmissive(part.component)
-    part.mesh.material.emissive.copy(emissive)
-    part.mesh.material.needsUpdate = true
+    const { mesh, component } = part
+    if (!mesh?.material) return
+    const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material]
+    const isSelected = Boolean(componentId && component?.id === componentId)
+    materials.forEach((material) => {
+      if (!material || !('emissive' in material)) return
+      if (isSelected) {
+        if (component?.status === 1) {
+          const base = getDefaultEmissive(component)
+          const highlightEmissive = base.clone().lerp(FAULT_HIGHLIGHT_TARGET, 0.6)
+          material.emissive.copy(highlightEmissive)
+        } else {
+          material.emissive.copy(SELECTED_EMISSIVE)
+        }
+      } else {
+        material.emissive.copy(getDefaultEmissive(component))
+      }
+      material.needsUpdate = true
+    })
+  })
+}
+
+const updateFaultPulse = (elapsedSeconds) => {
+  if (!motorParts.length) return
+  const normalized = (Math.sin(elapsedSeconds * Math.PI * 2) + 1) / 2
+  const minIntensity = 0.45
+  const maxIntensity = 1.2
+  const currentIntensity = minIntensity + (maxIntensity - minIntensity) * normalized
+  motorParts.forEach((part) => {
+    const { mesh, component } = part
+    if (!mesh?.material) return
+    const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material]
+    materials.forEach((material) => {
+      if (!material || typeof material.emissiveIntensity !== 'number') return
+      if (component?.status === 1) {
+        material.emissiveIntensity = currentIntensity
+      } else {
+        material.emissiveIntensity = 1
+      }
+    })
   })
 }
 
@@ -436,6 +476,8 @@ const disposeThree = () => {
   scene = null
   camera = null
   renderer = null
+  clock?.stop?.()
+  clock = null
   controls = null
   motorGroup = null
   motorParts = []
