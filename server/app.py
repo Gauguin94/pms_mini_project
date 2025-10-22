@@ -35,12 +35,35 @@ from anomaly_pipeline import (
     fetch_realtime_row_by_offset,
     run_autoencoder_inference,
     insert_ai_result,
-    retrain_autoencoder_from_newtrain,
+    # retrain_autoencoder_from_newtrain,
     load_model,
     load_scaler,
 )
 
+from anomaly_pipeline import run_retrain_with_logging as retrain_autoencoder_from_newtrain
+
 app = FastAPI(title="PMS Anomaly API", version="1.0.0")
+
+
+# === 포트 버그로 인해 코드 추가 === #
+from fastapi import APIRouter
+from fastapi.middleware.cors import CORSMiddleware
+# ★ CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173","http://127.0.0.1:5173"],
+    allow_credentials=True, allow_methods=["*"], allow_headers=["*"],
+)
+
+# ★ API prefix를 /api로 통일(프론트가 /api/...로 호출한다고 가정)
+api = APIRouter(prefix="/api")
+# === 포트 버그로 인해 코드 추가 === #
+
+
+
+
+
+
 
 @app.get("/debug/llm-key", summary="OPENAI 키/프로젝트 확인")
 def debug_llm_key():
@@ -86,6 +109,19 @@ class InferenceResult(BaseModel):
 class DetailedInference(InferenceResult):
     latent_vector: List[float]
 
+class RetrainLogBrief(BaseModel):
+    id: int
+    started_at: str
+    ended_at: Optional[str] = None
+    status: str
+    duration_sec: Optional[int] = None
+    message: Optional[str] = None
+
+class RetrainLogDetail(BaseModel):
+    seq: int
+    level: str
+    text: str
+    ts: str
 # ---- 유틸 ----
 def _get_realtime_count() -> int:
     with _db_connection() as conn:
@@ -181,13 +217,62 @@ def retrain(background: BackgroundTasks):
     background.add_task(retrain_autoencoder_from_newtrain)
     return {"status": "queued"}
 
+@api.get("/retrain/logs", response_model=List[RetrainLogBrief], summary="재학습 로그 목록")
+def retrain_logs(limit: int = Query(20, ge=1, le=200)):
+    with _db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT id, started_at, ended_at, status, duration_sec, message
+                FROM pms_retrain_log
+                ORDER BY id DESC
+                LIMIT %s;
+            """, (limit,))
+            rows = cur.fetchall()
+    return [
+        RetrainLogBrief(
+            id=row["id"],
+            started_at=str(row["started_at"]) if row.get("started_at") is not None else "",
+            ended_at=str(row["ended_at"]) if row.get("ended_at") is not None else None,
+            status=row.get("status", ""),
+            duration_sec=row.get("duration_sec"),
+            message=row.get("message"),
+        )
+        for row in rows
+    ]
+
+@api.get(
+    "/retrain/logs/{log_id}/details",
+    response_model=List[RetrainLogDetail],
+    summary="재학습 로그 상세",
+)
+def retrain_log_details(log_id: int, limit: int = Query(200, ge=1, le=2000)):
+    with _db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT seq, level, text, ts
+                FROM pms_retrain_log_detail
+                WHERE log_id=%s
+                ORDER BY seq ASC
+                LIMIT %s;
+            """, (log_id, limit))
+            rows = cur.fetchall()
+    return [
+        RetrainLogDetail(
+            seq=row["seq"],
+            level=row.get("level", "INFO"),
+            text=row.get("text", ""),
+            ts=str(row["ts"]) if row.get("ts") is not None else "",
+        )
+        for row in rows
+    ]
+
 @app.get("/ai-result/latest", summary="최근 AI 판정 N개 조회")
-def get_ai_results(n: int = Query(20, ge=1, le=200)):
+def get_ai_results(n: int = Query(20, ge=1, le=1000)):
     with _db_connection() as conn:
         with conn.cursor() as cur:
             cur.execute(
                 "SELECT id, result, created_at FROM pms_ai_result "
-                "ORDER BY id DESC LIMIT %s;", (n,)
+                "ORDER BY created_at DESC LIMIT %s;", (n,)
             )
             rows = cur.fetchall()
     return rows
@@ -423,3 +508,55 @@ def rag_render_html(advice_id: int):
     if not r or not r.get("answer_md"):
         raise HTTPException(404, "not found or empty")
     return f'<html><head><meta charset="utf-8"></head><body style="max-width:800px;margin:40px auto;font-family:system-ui">{markdown2.markdown(r["answer_md"])}</body></html>'
+
+
+
+
+@api.get("/realtime", summary="realtime_table의 time_rms 최신 N개만 반환")
+def api_realtime_only_time_rms(
+    limit: int = Query(50, ge=1, le=5000)
+):
+    """
+    반환 형태: [0.9031, 0.1415, ...]  (float 리스트)
+    - 우선순위: created_at DESC → id DESC → (COUNT로 offset 계산 후 LIMIT)
+    - id/created_at이 없을 때도 동작하도록 안전하게 처리함
+    """
+    with _db_connection() as conn:
+        with conn.cursor() as cur:
+            # 1) created_at 기준으로 최신 N개
+            try:
+                cur.execute(
+                    "SELECT time_rms FROM realtime_table ORDER BY created_at DESC LIMIT %s;",
+                    (limit,)
+                )
+                rows = cur.fetchall()
+                return [float(r["time_rms"]) for r in rows]
+            except Exception:
+                pass
+
+            # 2) id 기준으로 최신 N개
+            try:
+                cur.execute(
+                    "SELECT time_rms FROM realtime_table ORDER BY id DESC LIMIT %s;",
+                    (limit,)
+                )
+                rows = cur.fetchall()
+                return [float(r["time_rms"]) for r in rows]
+            except Exception:
+                pass
+
+            # 3) id/created_at 없을 때: 전체 카운트로 offset 계산 후 LIMIT
+            cur.execute("SELECT COUNT(*) AS cnt FROM realtime_table;")
+            cnt = int(cur.fetchone()["cnt"])
+            start = max(cnt - limit, 0)
+            cur.execute(
+                "SELECT time_rms FROM realtime_table LIMIT %s, %s;",
+                (start, limit)
+            )
+            rows = cur.fetchall()
+            return [float(r["time_rms"]) for r in rows]
+
+
+
+
+app.include_router(api)
